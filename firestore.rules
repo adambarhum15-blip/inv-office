@@ -29,7 +29,8 @@ service cloud.firestore {
     }
     // roster, links between phones and people, manager permissions
     match /team/{doc} {
-      allow read: if member();
+      // the full roster (personal scheduling rules and notes) only for the admin and schedule editors
+      allow read: if (member() && doc != 'roster') || isAdmin() || (doc == 'roster' && perm('sched'));
       allow write: if isAdmin();
       allow update: if doc == 'links' && selfLink();
     }

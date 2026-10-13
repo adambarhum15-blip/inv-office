@@ -1,5 +1,5 @@
 /* service worker: offline start, phone notifications */
-const VERSION='20261013140403';
+const VERSION='20261013122201';
 const SHELL=['./','./app.js','./fb.js','./config.js','./seed.js','./manifest.webmanifest','./icon-192.png','./apple-touch-icon.png'];
 const BASE=new URL('./',self.registration.scope).pathname;
 const CDN=/^https:\/\/(fonts\.googleapis\.com\/|fonts\.gstatic\.com\/)/;

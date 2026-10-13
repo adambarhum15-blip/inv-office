@@ -37,9 +37,9 @@ const SH={
   M15:{s:'מתואמת',l:'מתואמת',n:'מתואמת 15:00',ds:'משמרת ביניים',t:'15:00',k:'mid'},
   K:{s:'ב כונן',l:'ב כונן',n:'ב כונן',ds:'ערב וכוננות לילה · 17:00',t:'17:00',k:'night'},
   KC:{s:'ב-בימ"ש',l:'ב-בימ"ש',n:'ב-בימ"ש',ds:'בית משפט · מוצ"ש',t:'מוצ"ש',k:'court'},
-  R1:{s:'הר הבית',l:'הר הבית',n:'א הר הבית',ds:'תגבור בוקר · 08:00',t:'תגבור',k:'reinf'},
+  R1:{s:'הר הבית',l:'הר הבית',n:'תגבור בוקר הר הבית',ds:'תגבור בוקר · הר הבית · 08:00',t:'בוקר',k:'reinf'},
   R2:{s:'תגב׳ מש"ל',l:'תגבור',n:'תגבור מש"ל',ds:'תגבור בוקר · 08:00',t:'תגבור',k:'reinf'},
-  R3:{s:'תגבור 12',l:'תגבור',n:'תגבור צהריים',ds:'תגבור · 12:00',t:'12:00',k:'reinf'},
+  R3:{s:'הר הבית',l:'הר הבית',n:'תגבור צהריים הר הבית',ds:'תגבור צהריים · הר הבית',t:'צהריים',k:'reinf'},
   MGR:{s:'ניהולי',l:'ניהולי',n:'ניהולי',ds:'תפקיד ניהולי',t:'',k:'staff'},
   P:{s:'פ',l:'פגרה',n:'פ',ds:'פגרה · מנוחה שבועית',t:'',k:'off',g:'פגרה'},
   VAC:{s:'ח"ש',l:'ח"ש',n:'ח"ש',ds:'חופשה שנתית',t:'',k:'status',g:'חופשה'},
@@ -523,7 +523,7 @@ function LocalDB(){
     update:async(d)=>{if(!store[path])throw {code:'not-found',message:'missing'};const o=clone(store[path]);Object.keys(d).forEach(k=>{const ks=k.split('.');let t=o;for(let i=0;i<ks.length-1;i++){t[ks[i]]=t[ks[i]]||{};t=t[ks[i]];}t[ks[ks.length-1]]=d[k]===DEL?DEL:clone(d[k]);});store[path]=applyDel(o);persist();setTimeout(notify);},
     delete:async()=>{delete store[path];persist();setTimeout(notify);},
     acquire:async()=>({acquired:true}),
-    onSnapshot:(next)=>{const fn=()=>next(snap(path));subs.add(fn);setTimeout(fn);return()=>subs.delete(fn);},
+    onSnapshot:(next,err)=>{if((window.__LOCAL_DENY||[]).includes(path)){setTimeout(()=>err&&err({code:'permission-denied'}));return()=>{};}const fn=()=>next(snap(path));subs.add(fn);setTimeout(fn);return()=>subs.delete(fn);},
     collection:(p)=>collRef(path+'/'+p)};}
   function query(path,f,o,l){
     const run=()=>{const depth=path.split('/').length+1;let docs=Object.keys(store).filter(k=>k.startsWith(path+'/')&&k.split('/').length===depth).map(snap);
@@ -933,10 +933,20 @@ function applyRosterPatches(){
   S.rosterPatches=[...done].concat(todo.map(x=>x.id));
   saveRoster(rosterList().map(p=>{const o=Object.assign({},p);todo.forEach(x=>{if(x.set[p.id])Object.assign(o,x.set[p.id]);});return o;})).catch(()=>{});
 }
+/* what every team member may see about each person: name, team, role in the schedule grid. No rules, no notes. */
+const peopleView=list=>list.map(p=>{const o={id:p.id,name:p.name,kind:p.kind,tasks:!!p.tasks};if(p.team)o.team=p.team;if(p.lead)o.lead=true;if(p.removed)o.removed=true;return o;});
+let peopleSig='';
+function publishPeople(){
+  if(!ME.owner||!DB||!S.ready.roster||!S.rosterDoc||!S.fullRoster) return;
+  const people=peopleView(rosterList()), sig=JSON.stringify(people);
+  if(sig===peopleSig||sig===S.peopleSig) return;
+  peopleSig=sig;
+  serial('people',()=>withRetry(()=>DB.doc('team/people').set({people,updatedAt:Date.now()}))).catch(()=>{peopleSig='';});
+}
 function saveRoster(list){
   setRoster(list);
   const body={people:list.map(p=>{const o=clone(p);Object.keys(o).forEach(k=>{if(o[k]===undefined)delete o[k];});return o;}),patches:S.rosterPatches||[],updatedAt:Date.now()};
-  publishNames();
+  publishNames(); setTimeout(publishPeople,0);
   return serial('roster',()=>withRetry(()=>DB.doc('team/roster').set(body)));
 }
 function saveLinks(map,ever,meta){
@@ -1390,6 +1400,8 @@ function cellCode(W,g,r,d){
   if(r.kind==='staff') return d<5?r.fixed:'P';
   return null;
 }
+/* a start time the editor set by hand for one person on one day (e.g. "may come at 09:30") */
+const cellTime=(W,p,d,pub)=>{const m=W&&(pub?W.pubTimes:W.times);return (m&&m[p]&&m[p][d])||'';};
 const GROUPS=[['B','סידור צפוני'],['C','סידור רגיל'],['S','סטטוס מיוחד'],['A','קצינים ומטה · לא נספרים בתקן']];
 /* rows grouped by team: the team leader (ר"צ) first, then the team; then people without a team; officers last */
 function rosterGroups(){
@@ -1422,10 +1434,10 @@ function gridHtml(wk,g,o){
       const lk=W.locks&&W.locks[r.id]&&W.locks[r.id][d];
       const code=cellCode(W,g,r,d);
       const sh=code?SH[code]:null;
-      const label=sh?sh.s:'·';
-      const inner=code&&MID.has(code)?`<span class="two"><span>${esc(label)}</span><small>${esc(sh.t)}</small></span>`:esc(label);
+      const label=sh?sh.s:'·', ct=sh?cellTime(W,r.id,d,!!o.pub):'';
+      const inner=code&&(ct||MID.has(code)||code==='R1'||code==='R3')?`<span class="two"><span>${esc(label)}</span><small>${esc(ct||sh.t)}</small></span>`:esc(label);
       const cls=`cell k-${sh?sh.k:'empty'}${label.length>=5?' sm':''}${lk?' lock':''}${bad.has(r.id+':'+d)?' bad':''}`;
-      const aria=`${r.name}, ${DAYS[d]}: ${sh?sh.n:'לא משובץ'}`;
+      const aria=`${r.name}, ${DAYS[d]}: ${sh?sh.n:'לא משובץ'}${ct?' · '+ct:''}`;
       return `<td>${o.editable?`<button type="button" class="${cls}" data-act="cell" data-p="${r.id}" data-d="${d}" aria-label="${esc(aria)}">${inner}</button>`:`<span class="${cls}" aria-label="${esc(aria)}">${inner}</span>`}</td>`;
     }).join('');
     return `<tr class="${r.id===o.me?'me':''}${r.lead?' lead':''}"><th class="nm" scope="row">${ctx.tri.includes(r.id)?'<i class="tri" aria-hidden="true"></i>':''}<span>${esc(r.name)}</span>${leadTag(r)}</th>${cells}</tr>`;
@@ -1443,7 +1455,7 @@ function slotsFor(d,W){
   if(d===5) return [{codes:['A','A9'],name:'בוקר',t:'08:00',need:1,k:'am'},{codes:['AC'],name:'א-בימ"ש',t:'08:00',need:1,k:'court'},{codes:['K'],name:'ב כונן',t:'17:00',need:1,k:'night'},{codes:['MS'],name:'א-מש"ל',t:'08:00',need:0,k:'am'},{codes:MIDC,name:'מתואמת',t:'',need:0,k:'mid'},{codes:['R1','R2','R3'],name:'תגבור',t:'',need:0,k:'reinf'}];
   return [{codes:['A','A9'],name:'בוקר',t:'08:00',need:1,k:'am'},{codes:['K'],name:'ב כונן',t:'17:00',need:1,k:'night'},{codes:['KC'],name:'ב-בימ"ש',t:'מוצ"ש',need:1,k:'court'},{codes:['MS'],name:'א-מש"ל',t:'08:00',need:0,k:'am'},{codes:MIDC,name:'מתואמת',t:'',need:0,k:'mid'},{codes:['R1','R2','R3'],name:'תגבור',t:'',need:0,k:'reinf'}];
 }
-function dayHtml(wk,g,me){
+function dayHtml(wk,g,me,pub){
   const ctx=weekCtx(wk), d=U.schedDay;
   const chips=`<div class="chips" role="group" aria-label="בחירת יום">${[0,1,2,3,4,5,6].map(i=>`<button type="button" class="chip" data-act="sday" data-d="${i}" aria-pressed="${i===d}">${DSH[i]}<span class="n">${ctx.dates[i]}</span></button>`).join('')}</div>`;
   const sec=slotsFor(d,ctx.W).map(sl=>{
@@ -1451,7 +1463,7 @@ function dayHtml(wk,g,me){
     if(!ps.length&&!sl.need) return '';
     const cls=ps.length<sl.need?'short':(sl.need&&ps.length>sl.need?'over':'');
     const chips2=ps.length?ps.map(p=>{
-      const c=g[p][d], extra=c==='A9'?'09:00':MID.has(c)?SH[c].t:(sl.k==='reinf'?SH[c].n:'');
+      const c=g[p][d], ct=cellTime(ctx.W,p,d,pub), extra=ct||(c==='A9'?'09:00':MID.has(c)?SH[c].t:(sl.k==='reinf'?SH[c].n:''));
       return `<span class="nchip${p===me?' me':''}">${esc(name(p))}${extra?` <small>${esc(extra)}</small>`:''}</span>`;
     }).join(''):'<span class="hint">אין שיבוץ</span>';
     return `<section class="slot"><div class="slot-h"><span class="sw k-${sl.k}"></span><strong>${sl.name}</strong><span class="t">${sl.t}</span>${sl.need?`<span class="need ${cls}">${ps.length}/${sl.need}</span>`:''}</div><div class="names">${chips2}</div></section>`;
@@ -1461,12 +1473,12 @@ function dayHtml(wk,g,me){
   const st=staff.length?`<div><b>קצינים ומטה:</b> ${staff.map(r=>`${esc(r.name)} (${esc(SH[g[r.id][d]].n)})`).join(', ')}</div>`:'';
   return chips+`<div class="list">${sec}</div>${offs||st?`<div class="offs">${offs}${st}</div>`:''}`;
 }
-function myWeekHtml(wk,g,me){
-  const ti=wk===curWeek()?todayIdx():-1;
+function myWeekHtml(wk,g,me,pub){
+  const ti=wk===curWeek()?todayIdx():-1, W=S.sched[wk];
   if(!g[me]) return '';
   return `<h3 class="sec">המשמרות שלי</h3><div class="myweek">${[0,1,2,3,4,5,6].map(d=>{
     const c=g[me][d], sh=c?SH[c]:null;
-    return `<div class="mw k-${sh?sh.k:'empty'}${d===ti?' today':''}"><span class="d">${DSH[d]}</span><span class="c${sh&&sh.l.length>=5?' sm':''}">${sh?esc(sh.l):'—'}</span><span class="t">${sh&&sh.t?esc(sh.t):'&nbsp;'}</span></div>`;
+    return `<div class="mw k-${sh?sh.k:'empty'}${d===ti?' today':''}"><span class="d">${DSH[d]}</span><span class="c${sh&&sh.l.length>=5?' sm':''}">${sh?esc(sh.l):'—'}</span><span class="t">${sh?esc(cellTime(W,me,d,pub)||sh.t||'')||'&nbsp;':'&nbsp;'}</span></div>`;
   }).join('')}</div>`;
 }
 function modeSeg(){
@@ -1500,7 +1512,7 @@ function reinfHtml(wk,g){
     const dl=`${DAYS[r.d]} ${ctx.dates[r.d]}`;
     const done=r.already.length?`<div class="rdone">בתגבור: ${r.already.map(p=>`${esc(name(p))} (${esc(SH[g[p][r.d]].n)})`).join(', ')}</div>`:'';
     if(!r.surplus) return `<div class="rday"><div class="rday-h"><strong>${dl}</strong><span>${r.act} פעילים</span></div>${done}</div>`;
-    const ppl=r.people.length?r.people.map(p=>`<div class="rp"><span class="who2">${esc(name(p))}</span><button type="button" class="btn btn-ghost btn-sm" data-act="reinf" data-p="${p}" data-d="${r.d}" data-c="R1">הר הבית</button><button type="button" class="btn btn-ghost btn-sm" data-act="reinf" data-p="${p}" data-d="${r.d}" data-c="R2">מש"ל</button><button type="button" class="btn btn-ghost btn-sm" data-act="reinf" data-p="${p}" data-d="${r.d}" data-c="R3">צהריים</button></div>`).join(''):'<div class="rdone">אין חוקר כשיר שאפשר להסיט בלי לרדת מתחת לתקן הבוקר.</div>';
+    const ppl=r.people.length?r.people.map(p=>`<div class="rp"><span class="who2">${esc(name(p))}</span><button type="button" class="btn btn-ghost btn-sm" data-act="reinf" data-p="${p}" data-d="${r.d}" data-c="R1">הר הבית בוקר</button><button type="button" class="btn btn-ghost btn-sm" data-act="reinf" data-p="${p}" data-d="${r.d}" data-c="R2">מש"ל</button><button type="button" class="btn btn-ghost btn-sm" data-act="reinf" data-p="${p}" data-d="${r.d}" data-c="R3">הר הבית צהריים</button></div>`).join(''):'<div class="rdone">אין חוקר כשיר שאפשר להסיט בלי לרדת מתחת לתקן הבוקר.</div>';
     return `<div class="rday"><div class="rday-h"><strong>${dl}</strong><span>${r.act} פעילים · <span class="plus">${r.surplus} מעל התקן</span></span></div>${ppl}${done}</div>`;
   }).join('');
   return `<section class="reinf"><div class="reinf-h">${svg('shift')}<strong>המלצות לתגבור</strong></div>${days||'<p class="hint">אין השבוע עודף מעל התקן.</p>'}<p class="hint">ההמלצות רק מתוך ${REINF_IDS.length} החוקרים הכשירים לתגבור, ומשאירות את תקן הבוקר מלא. בימים ד׳–ה׳ כדאי לבדוק את השבוע הבא.</p></section>`;
@@ -1513,14 +1525,14 @@ function viewSchedule(){
   let h=`<div class="vhead"><div><h2>סידור עבודה</h2><p class="sub">${admin?'שיבוץ אוטומטי לפי תקן, כללים אישיים וחוקי מנוחה':'המשמרות שלך ושל הצוות'}</p></div></div>
     <div class="weeknav">
       <button type="button" class="navbtn" data-act="week" data-dir="-1" aria-label="שבוע קודם">${svg('chevR')}</button>
-      <div class="wk"><strong>${rel?`${rel} · `:''}<span class="mono">${ctx.dates[0]}–${ctx.dates[6]}</span></strong><span>סבב סופ"ש: ${esc(ctx.tri.map(name).join(', ')||'אין שלישייה')}</span></div>
+      <div class="wk"><strong>${rel?`${rel} · `:''}<span class="mono">${ctx.dates[0]}–${ctx.dates[6]}</span></strong>${admin?`<span>סבב סופ"ש: ${esc(ctx.tri.map(name).join(', ')||'אין שלישייה')}</span>`:''}</div>
       <button type="button" class="navbtn" data-act="week" data-dir="1" aria-label="שבוע הבא">${svg('chevL')}</button>
     </div>`;
   if(!S.ready.sched) return h+`<div class="empty">טוען סידור…</div>`;
   if(!admin){
     const g=W&&W.published?W.pubGrid:null;
     if(!g) return h+`<div class="empty">הסידור לשבוע הזה עוד לא פורסם. כשהמנהל יפרסם אותו תקבל התראה.</div>`;
-    return h+myWeekHtml(wk,g,me)+modeSeg()+(U.schedMode==='day'?dayHtml(wk,g,me):gridHtml(wk,g,{me})+legendHtml(false));
+    return h+myWeekHtml(wk,g,me,true)+modeSeg()+(U.schedMode==='day'?dayHtml(wk,g,me,true):gridHtml(wk,g,{me,pub:true})+legendHtml(false));
   }
   const rosterBtn=`<button type="button" class="btn btn-ghost" data-act="team">${svg('users')}${isAdmin()?'צוות וכללי שיבוץ':'הצוות וכללי השיבוץ'}</button>`;
   if(!W||!W.grid){
@@ -1556,7 +1568,7 @@ function schedText(wk,g){
     out.push(`*${DAYS[d]} ${ctx.dates[d]}*`);
     slotsFor(d,ctx.W).forEach(sl=>{
       const ps=DYN.filter(p=>g[p]&&sl.codes.includes(g[p][d])); if(!ps.length) return;
-      out.push(`${sl.name}${sl.t?' '+sl.t:''}: ${ps.map(p=>name(p)+(g[p][d]==='A9'?' (09:00)':'')+(MID.has(g[p][d])?` (${SH[g[p][d]].t})`:'')+(sl.k==='reinf'?` (${SH[g[p][d]].n})`:'')).join(', ')}`);
+      out.push(`${sl.name}${sl.t?' '+sl.t:''}: ${ps.map(p=>name(p)+(cellTime(ctx.W,p,d)?` (${cellTime(ctx.W,p,d)})`:'')+(g[p][d]==='A9'?' (09:00)':'')+(MID.has(g[p][d])?` (${SH[g[p][d]].t})`:'')+(sl.k==='reinf'?` (${SH[g[p][d]].n})`:'')).join(', ')}`);
     });
     ['VAC','SICK','STUDY'].forEach(c=>{const ps=DYN.filter(p=>g[p]&&g[p][d]===c);if(ps.length)out.push(`${SH[c].g}: ${ps.map(name).join(', ')}`);});
     out.push('');
@@ -1810,6 +1822,10 @@ function cellSheet(wk,p,d){
     ${grp('היעדרות',['P','VAC','SICK','STUDY','LEAVE','COURSE'])}
     ${grp('תגבור',['R1','R2','R3'])}
     ${r.kind==='staff'?grp('קבועים',['MGR']):''}
+    ${cur&&isWork(cur)?(()=>{const ct=cellTime(W,p,d);return `<div class="opts-g"><h4>שעת התחלה</h4>
+      <div class="timerow"><input id="cs-time" class="input" type="time" step="300" value="${esc(ct||(/^\d\d:\d\d$/.test(SH[cur].t)?SH[cur].t:'08:00'))}" aria-label="שעת התחלה">
+      <button type="button" class="btn btn-primary btn-sm" data-act="set-time">קביעת שעה</button>${ct?'<button type="button" class="btn btn-ghost btn-sm" data-act="clear-time">שעה רגילה</button>':''}</div>
+      <p class="hint">${ct?`נקבעה שעה מיוחדת: ${esc(ct)}.`:`השעה הרגילה של ${esc(SH[cur].n)}${/^\d\d:\d\d$/.test(SH[cur].t)?' היא '+esc(SH[cur].t):''}. אפשר לקבוע לו שעת הגעה אחרת ליום הזה.`}</p></div>`;})():''}
     ${lk?`<button type="button" class="btn btn-ghost" data-act="unlock">${svg('reset')}ביטול השינוי הידני</button>`:''}
     <p class="hint">${g?'שינוי ידני נשאר במקומו גם ביצירה מחדש של הסידור.':'זה אילוץ לפני יצירת הסידור. המנוע ישבץ סביבו.'}</p>`;
 }
@@ -1851,6 +1867,9 @@ function teamSheet(){
   const row=r=>{const us=devsOf(r.id), u=us[0], m=permOf(r.id), mt=[m.tasks?'שליחת משימות':'',m.sched?'סידור עבודה':''].filter(Boolean).join(' · ');
     return `<li class="trow"><span class="tt"><span class="tn">${esc(r.name)}${r.lead?' <span class="tlink on">ר"צ</span>':''} ${own?`<span class="tlink ${u?'on':'off'}">${u?'מחובר':'לא מחובר'}</span>`:''}${mt?` <span class="tlink on">מנהל: ${esc(mt)}</span>`:''}</span><span class="ts">${esc(personRules(r).join(' · '))}${r.notes?` · ${esc(r.notes)}`:''}</span>${own?us.map(x=>`<span class="ts">${esc(devText(x))} ${loginTag(x)} <button type="button" class="linkbtn mini" data-act="unlink" data-u="${esc(x)}">ניתוק</button></span>`).join(''):''}</span>
       ${own?`<span class="ta"><button type="button" class="btn btn-ghost btn-sm" data-act="edit-person" data-p="${r.id}">עריכה</button>${(()=>{const x=us.find(z=>S.authOf[z]&&S.authOf[z].hash);return x?`<button type="button" class="btn btn-ghost btn-sm" data-act="reset-pn" data-u="${esc(x)}">איפוס כניסה</button>`:'';})()}</span>`:''}</li>`;};
+  if(!own&&!canSchedV()) return `<div class="grab"></div>
+    <div class="phead"><h3 class="ptitle" id="sheet-title">הצוותים</h3><button type="button" class="x" data-act="close" aria-label="סגירה">${svg('x')}</button></div>
+    ${rosterGroups().map(([gl,ps])=>`<div class="tgroup"><h4>${esc(gl)}</h4><ul class="tlist">${ps.map(r=>`<li class="trow"><span class="tt"><span class="tn">${esc(r.name)}${r.lead?' <span class="tlink on">ר"צ</span>':''}</span></span></li>`).join('')}</ul></div>`).join('')}`;
   if(!own) return `<div class="grab"></div>
     <div class="phead"><h3 class="ptitle" id="sheet-title">הצוות וכללי השיבוץ</h3><button type="button" class="x" data-act="close" aria-label="סגירה">${svg('x')}</button></div>
     <p class="hint">רק המנהל הראשי מוסיף אנשים, מאשר גישה ומשנה כללים והרשאות.</p>
@@ -2048,8 +2067,10 @@ function setCell(wk,p,d,code){
     const prev=ex?ex.prev:(W.grid?W.grid[p][d]:null);
     W.locks[p][d]={c:code,prev:prev==null?null:prev};
     if(W.grid) W.grid[p][d]=code;
+    if(W.times&&W.times[p]) delete W.times[p][d];
   });
 }
+function keepTimesOnLocks(W){if(W.times)Object.keys(W.times).forEach(p=>Object.keys(W.times[p]).forEach(d=>{if(!(W.locks&&W.locks[p]&&W.locks[p][d]))delete W.times[p][d];}));}
 function readPersonForm(f){
   const kind=(f.querySelector('input[name="pe-kind"]:checked')||{}).value||'rot';
   const shifts=[...f.querySelectorAll('[data-sh]')].filter(x=>x.checked).map(x=>x.dataset.sh);
@@ -2148,7 +2169,7 @@ document.addEventListener('click',e=>{
       case 'newme': U.newMe=true; render(); setTimeout(()=>{const n=$('#nm-name');if(n)n.focus();},50); return;
       case 'newme-back': U.newMe=false; render(); return;
       case 'team': if(a.id==='push') a.hidden=true; U.sheet={type:'team'}; renderSheet(); return;
-      case 'rules': U.sheet={type:'rules'}; renderSheet(); return;
+      case 'rules': if(!canSchedV()) return; U.sheet={type:'rules'}; renderSheet(); return;
       case 'edit-person': U.sheet={type:'person',id:a.dataset.p||null,uid:null}; renderSheet(); return;
       case 'add-from-claim': U.sheet={type:'person',id:null,uid:a.dataset.u}; renderSheet(); return;
       case 'approve':{
@@ -2184,17 +2205,26 @@ document.addEventListener('click',e=>{
       case 'smode': U.schedMode=a.dataset.m; renderView(); saveUI(); return;
       case 'sday': U.schedDay=+a.dataset.d; renderView(); return;
       case 'cell': if(!canSchedV()) return; U.sheet={type:'cell',wk:U.schedWeek,p:a.dataset.p,d:+a.dataset.d}; renderSheet(); return;
+      case 'set-time':{
+        const sh=U.sheet, v=($('#cs-time')||{}).value||''; if(!/^\d\d:\d\d$/.test(v)){toast('בחר שעה.');return;}
+        weekEdit(sh.wk,W=>{
+          const cur=W.grid&&W.grid[sh.p]?W.grid[sh.p][sh.d]:(W.locks[sh.p]&&W.locks[sh.p][sh.d]?W.locks[sh.p][sh.d].c:null);
+          W.times=W.times||{}; (W.times[sh.p]=W.times[sh.p]||{})[sh.d]=v;
+          W.locks[sh.p]=W.locks[sh.p]||{}; if(!W.locks[sh.p][sh.d]&&cur) W.locks[sh.p][sh.d]={c:cur,prev:cur};
+        });
+        closeSheet(); toast(`${name(sh.p)}, ${DAYS[sh.d]}: מגיע ב-${v}`); return;}
+      case 'clear-time':{const sh=U.sheet;weekEdit(sh.wk,W=>{if(W.times&&W.times[sh.p])delete W.times[sh.p][sh.d];});closeSheet();toast('חזר לשעה הרגילה.');return;}
       case 'set-cell':{const sh=U.sheet;setCell(sh.wk,sh.p,sh.d,a.dataset.c);closeSheet();toast(`${name(sh.p)}, ${DAYS[sh.d]}: ${SH[a.dataset.c].n}`);return;}
-      case 'unlock':{const sh=U.sheet;weekEdit(sh.wk,W=>{const L=W.locks[sh.p]&&W.locks[sh.p][sh.d];if(!L)return;delete W.locks[sh.p][sh.d];if(W.grid&&W.grid[sh.p])W.grid[sh.p][sh.d]=L.prev;});closeSheet();toast('השינוי הידני בוטל.');return;}
+      case 'unlock':{const sh=U.sheet;weekEdit(sh.wk,W=>{const L=W.locks[sh.p]&&W.locks[sh.p][sh.d];if(W.times&&W.times[sh.p])delete W.times[sh.p][sh.d];if(!L)return;delete W.locks[sh.p][sh.d];if(W.grid&&W.grid[sh.p])W.grid[sh.p][sh.d]=L.prev;});closeSheet();toast('השינוי הידני בוטל.');return;}
       case 'reinf':{const p=a.dataset.p,d=+a.dataset.d,c=a.dataset.c;setCell(U.schedWeek,p,d,c);toast(`${name(p)} הוסט ל${SH[c].n} ביום ${DAYS[d]}.`);return;}
       case 'reduce':{const d=+a.dataset.d,l=+a.dataset.l,wk=U.schedWeek;weekEdit(wk,W=>{W.reduce=W.reduce||{};if(l)W.reduce[d]=l;else delete W.reduce[d];repairDay(W,wk,d);});toast(l?`התקן ביום ${DAYS[d]} קוזז.`:`הקיזוז ביום ${DAYS[d]} בוטל.`);return;}
-      case 'gen':{const wk=U.schedWeek;weekEdit(wk,W=>{W.grid=generateGrid(wk,W.gen||0);W.gen=(W.gen||0)+1;W.genAt=Date.now();});toast('הסידור נוצר. בדוק אותו ופרסם לחוקרים.');return;}
-      case 'regen':{const wk=U.schedWeek;arm(a,'לאשר? שינויים ידניים יישארו',()=>{weekEdit(wk,W=>{W.grid=generateGrid(wk,W.gen||0);W.gen=(W.gen||0)+1;W.genAt=Date.now();});toast('נוצרה גרסה חדשה. השינויים הידניים נשארו במקומם.');});return;}
+      case 'gen':{const wk=U.schedWeek;weekEdit(wk,W=>{keepTimesOnLocks(W);W.grid=generateGrid(wk,W.gen||0);W.gen=(W.gen||0)+1;W.genAt=Date.now();});toast('הסידור נוצר. בדוק אותו ופרסם לחוקרים.');return;}
+      case 'regen':{const wk=U.schedWeek;arm(a,'לאשר? שינויים ידניים יישארו',()=>{weekEdit(wk,W=>{keepTimesOnLocks(W);W.grid=generateGrid(wk,W.gen||0);W.gen=(W.gen||0)+1;W.genAt=Date.now();});toast('נוצרה גרסה חדשה. השינויים הידניים נשארו במקומם.');});return;}
       case 'publish':{
         const wk=U.schedWeek; if(!canSchedV()||!S.sched[wk]||!S.sched[wk].grid) return;
         if(readOnly()){toast(blockedMsg());return;}
         const W=clone(S.sched[wk]), upd=!!W.published;
-        W.pubGrid=clone(W.grid); W.published=true; W.pubAt=Date.now(); W.pubCount=(W.pubCount||0)+1; W.dirty=false;
+        W.pubGrid=clone(W.grid); W.pubTimes=clone(W.times||{}); W.published=true; W.pubAt=Date.now(); W.pubCount=(W.pubCount||0)+1; W.dirty=false;
         S.sched[wk]=W; saveWeek(wk); render();
         notifySched(wk,upd);
         toast(upd?'העדכון פורסם. החוקרים יקבלו התראה.':'הסידור פורסם. החוקרים יקבלו התראה.');
@@ -2469,7 +2499,8 @@ async function runSystemCheck(){
     await expect('כניסה עם מספר אישי נכון מצרפת את הטלפון','allow',()=>selfLink(pc.h));
     await sleep(700);
     await expect('טלפון מחובר לא יכול לצרף טלפון אחר','deny',()=>P.db.doc('team/links').update({['map.zz'+ts]:PID}));
-    await expect('טלפון מאושר רואה את הצוות','allow',()=>P.db.doc('team/roster').get());
+    await expect('טלפון מאושר רואה את רשימת הצוות','allow',()=>P.db.doc('team/people').get());
+    await expect('חוקר לא רואה את כללי השיבוץ','deny',()=>P.db.doc('team/roster').get());
     await expect('טלפון מאושר רואה משימות','allow',()=>P.db.collection('tasks').limit(1).get());
     await expect('חוקר לא יוצר משימות','deny',()=>P.db.doc('tasks/'+tkey+'x').set({num:1,desc:'בדיקה',prio:'low',assignee:null,createdAt:Date.now(),createdBy:PID,status:'open',takenBy:null,takenAt:null,doneAt:null,test:true}));
     await DB.doc('tasks/'+tkey).set({num:0,desc:'בדיקת מערכת',prio:'low',assignee:PID,createdAt:Date.now(),createdBy:'admin',status:'open',takenBy:null,takenAt:null,doneAt:null,test:true});
@@ -2486,6 +2517,7 @@ async function runSystemCheck(){
     await expect('חוקר שולח התראה לצוות','allow',()=>P.db.doc('outbox/'+tkey).set({to:[pu],title:'בדיקה',body:'',by:pu,at:Date.now(),test:true}));
     await DB.doc('team/perms').set({managers:{[PID]:{tasks:true,sched:true}}},{merge:true});
     await sleep(700);
+    await expect('מנהל סידור רואה את כללי השיבוץ','allow',()=>P.db.doc('team/roster').get());
     await expect('מנהל סידור שומר סידור','allow',()=>P.db.doc('sched/'+wk).set({test:true,savedAt:Date.now(),savedBy:PID}));
     await expect('מנהל משימות יוצר משימה','allow',()=>P.db.tx(async t=>{const c=await t.get('meta/counter');pnum=((c&&c.n)||1000)+1;t.set('meta/counter',{n:pnum});t.set('tasks/'+tkey+'m',{num:pnum,desc:'בדיקה',prio:'low',assignee:PID,createdAt:Date.now(),createdBy:PID,status:'open',takenBy:null,takenAt:null,doneAt:null,test:true});}));
     await expect('מנהל משימות מוחק משימה','allow',()=>P.db.doc('tasks/'+tkey+'m').delete());
@@ -2592,8 +2624,22 @@ function subscribeAll(){
 function subscribeMember(){
   unsubMember();
   const m=x=>memberSubs.push(x);
-  m(DB.doc('team/roster').onSnapshot(d=>{const v=d.exists?d.data():null;S.rosterDoc=!!v;S.rosterPatches=(v&&v.patches)||[];setRoster(v&&v.people);S.ready.roster=true;changed();setTimeout(applyRosterPatches,0);},onSubErr));
-  m(DB.doc('team/perms').onSnapshot(d=>{const v=d.exists?d.data():{};S.perms={managers:Object.assign({},v.managers||{})};S.ready.perms=true;changed();},onSubErr));
+  /* everyone: the public view of the team; editors: the full roster with rules (the server refuses it to everyone else) */
+  m(DB.doc('team/people').onSnapshot(d=>{
+    const v=d.exists?d.data():null; S.peopleSig=v?JSON.stringify(v.people||[]):'';
+    if(!S.fullRoster&&!ME.owner){S.rosterDoc=!!v;setRoster(v&&v.people);S.ready.roster=true;changed();}
+    if(ME.owner) setTimeout(publishPeople,0);
+  },onSubErr));
+  m(DB.doc('team/roster').onSnapshot(d=>{
+    const v=d.exists?d.data():null;S.fullRoster=true;S.rosterDoc=!!v;S.rosterPatches=(v&&v.patches)||[];setRoster(v&&v.people);S.ready.roster=true;changed();
+    setTimeout(applyRosterPatches,0); setTimeout(publishPeople,0);
+  },()=>{S.fullRoster=false;}));
+  m(DB.doc('team/perms').onSnapshot(d=>{
+    const v=d.exists?d.data():{}, mine=p=>!!(p.managers&&p.managers[S.links[ME.uid]]&&p.managers[S.links[ME.uid]].sched);
+    const was=S.ready.perms&&!ME.owner?mine(S.perms):null;
+    S.perms={managers:Object.assign({},v.managers||{})};S.ready.perms=true;changed();
+    if(was!==null&&was!==mine(S.perms)){S.fullRoster=false;setTimeout(subscribeMember,300);}  /* schedule permission changed: roster access changed */
+  },onSubErr));
   const since=Date.now()-TASK_WINDOW; if(!S.loadedFrom||S.loadedFrom>since) S.loadedFrom=since;
   const toMap=s=>{const o={};s.docs.forEach(d=>{o[d.id]=d.data();});return o;};
   m(DB.collection('tasks').where('createdAt','>=',since).onSnapshot(s=>{S.taskDocs=toMap(s);S.ready.tasks=true;changed();},onSubErr));
