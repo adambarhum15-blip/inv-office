@@ -1704,9 +1704,9 @@ function taskSheet(t){
     <p class="fulldesc">${esc(t.desc)}</p>
     <dl class="kv">${kv.map(([k,v])=>`<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
     <section class="logsec"><h4>${svg('lock')}יומן אירועים</h4><ol class="log">${log}</ol>
-      <p class="locknote">היומן נכתב אוטומטית עם חותמת זמן לכל שלב, והשרת לא מאפשר לשנות אותו. רק המנהל הראשי יכול למחוק משימה.</p></section>
+      <p class="locknote">היומן נכתב אוטומטית עם חותמת זמן לכל שלב, והשרת לא מאפשר לשנות אותו. רק מי שמורשה לשלוח משימות יכול למחוק משימה.</p></section>
     ${act?`<div class="cact">${act}</div>`:''}
-    ${isAdmin()?`<button type="button" class="btn btn-danger" data-act="del-task" data-id="${esc(t.key)}">מחיקת המשימה</button>`:''}`;
+    ${canSendV()&&!readOnly()?`<button type="button" class="btn btn-danger" data-act="del-task" data-id="${esc(t.key)}">מחיקת המשימה</button>`:''}`;
 }
 function assigneeOptions(){
   const g=gridFor(curWeek()), d=todayIdx();
@@ -2053,7 +2053,7 @@ document.addEventListener('click',e=>{
       case 'skip-import': U.skipImport=true; render(); return;
       case 'apk': return;
       case 'del-task':{
-        const key=a.dataset.id; if(!isAdmin()||readOnly()) return;
+        const key=a.dataset.id; if(!canSendV()||readOnly()) return;
         arm(a,'למחוק לצמיתות? לחץ שוב לאישור',()=>{
           const t=S.tasks.find(x=>x.key===key), num=t?t.id:'';
           delete S.taskDocs[key]; delete S.taskOpen[key]; delete S.taskOld[key];
@@ -2424,6 +2424,7 @@ async function runSystemCheck(){
     await expect('אי אפשר לקחת משימה שכבר נלקחה','deny',()=>P.db.doc('tasks/'+tkey).update({status:'progress',takenBy:PID,takenAt:Date.now()+1}));
     await expect('חוקר מסמן בוצע','allow',()=>P.db.doc('tasks/'+tkey).update({status:'done',doneAt:Date.now()}));
     await expect('אי אפשר לשנות משימה שבוצעה','deny',()=>P.db.doc('tasks/'+tkey).update({desc:'שונה'}));
+    await expect('חוקר לא מוחק משימות','deny',()=>P.db.doc('tasks/'+tkey).delete());
     await expect('חוקר לא משנה את הסידור','deny',()=>P.db.doc('sched/'+wk).set({test:true}));
     await expect('חוקר לא משנה הרשאות','deny',()=>P.db.doc('team/perms').set({managers:{[PID]:{tasks:true,sched:true}}}));
     await expect('חוקר לא קורא נתונים פרטיים של אחרים','deny',()=>P.db.doc(`data/users/${ME.uid}/auth`).get());
@@ -2433,6 +2434,7 @@ async function runSystemCheck(){
     await sleep(700);
     await expect('מנהל סידור שומר סידור','allow',()=>P.db.doc('sched/'+wk).set({test:true,savedAt:Date.now(),savedBy:PID}));
     await expect('מנהל משימות יוצר משימה','allow',()=>P.db.tx(async t=>{const c=await t.get('meta/counter');pnum=((c&&c.n)||1000)+1;t.set('meta/counter',{n:pnum});t.set('tasks/'+tkey+'m',{num:pnum,desc:'בדיקה',prio:'low',assignee:PID,createdAt:Date.now(),createdBy:PID,status:'open',takenBy:null,takenAt:null,doneAt:null,test:true});}));
+    await expect('מנהל משימות מוחק משימה','allow',()=>P.db.doc('tasks/'+tkey+'m').delete());
     await expect('מנהל משימות לא מדלג במספור','deny',()=>P.db.tx(async t=>{const c=await t.get('meta/counter');const n=((c&&c.n)||1000)+5;t.set('meta/counter',{n});t.set('tasks/'+tkey+'n',{num:n,desc:'בדיקה',prio:'low',assignee:PID,createdAt:Date.now(),createdBy:PID,status:'open',takenBy:null,takenAt:null,doneAt:null,test:true});}));
   }catch(e){add('הבדיקה נעצרה באמצע',false,(e&&e.code)||String((e&&e.message)||e));}
   /* clean up everything the check created */

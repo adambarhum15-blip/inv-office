@@ -72,7 +72,7 @@ service cloud.firestore {
       allow read: if member();
       allow create: if isAdmin() || (perm('tasks') && validNewTask());
       allow update: if isAdmin() || takes() || finishes();
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || perm('tasks');
     }
     function validNewTask() {
       let d = request.resource.data;
