@@ -756,7 +756,7 @@ function lockHtml(){
     ${bioOnDevice()?`<button type="button" class="btn btn-ghost bio-btn" data-act="bio-unlock">${svg(bioIcon())}כניסה עם ${bioName()}</button>`:''}
     ${keysHtml()}
     ${S.auth&&S.auth.len?'':`<button type="button" class="btn btn-primary" id="pn-ok" data-act="pn-ok" disabled>כניסה</button>`}
-    <div class="lk-foot">${req?'<p class="hint">ביקשת מהמנהל לאפס את המספר. אחרי האיפוס תגדיר כאן מספר חדש.</p>':'<button type="button" class="linkbtn" data-act="pn-forgot">שכחתי את המספר האישי</button>'}</div>
+    <div class="lk-foot">${req?'<p class="hint">ביקשת מהמנהל לאפס את המספר. אחרי האיפוס תגדיר כאן מספר חדש.</p>':'<button type="button" class="linkbtn" data-act="pn-forgot">שכחתי את המספר האישי</button>'}${ME.owner?'':'<button type="button" class="linkbtn subtle" data-act="admin-login">כניסת מנהל ראשי</button>'}</div>
   </div>`;
 }
 function setupHtml(){
@@ -1243,7 +1243,8 @@ function gateHtml(){
   if(c&&!c.approved&&(c.person||c.newName)&&!U.reclaim) return `<div class="gate"><h2>ממתין לאישור המנהל</h2>
     <p>ביקשת להתחבר בשם <b>${esc(claimLabel(c))}</b>${c.newName?' (שם חדש ברשימה)':''}. ברגע שהמנהל יאשר, האפליקציה תיפתח כאן מעצמה.</p>
     <p>מהפעם הבאה נכנסים עם המספר האישי${bioOnDevice()?` או עם ${bioName()}`:''}.</p>
-    <button type="button" class="btn btn-ghost" data-act="reclaim">לשנות את הבקשה</button></div>`;
+    <button type="button" class="btn btn-ghost" data-act="reclaim">לשנות את הבקשה</button>
+    <button type="button" class="linkbtn subtle" data-act="admin-login">כניסת מנהל ראשי</button></div>`;
   if(U.newMe) return `<div class="gate"><h2>השם שלי לא ברשימה</h2><p>מלא את הפרטים. המנהל יוסיף אותך לצוות, יחליט אם אתה חלק מהסידור ויקבע לך כללי שיבוץ.</p>
     <form id="newme-form" novalidate>
       <div class="field"><label for="nm-name">שם מלא</label><input id="nm-name" class="input" maxlength="40" autocomplete="name"></div>
@@ -1879,7 +1880,7 @@ function meSheet(){
     </section>
     ${pushSection()}
     <button type="button" class="btn btn-primary" data-act="lock">${svg('lock')}נעילה עכשיו</button>
-    ${ME.owner?'<button type="button" class="btn btn-ghost" data-act="admin-logout">התנתקות מהמכשיר</button>':''}`;
+    ${ME.owner?'<button type="button" class="btn btn-ghost" data-act="admin-logout">התנתקות מהמכשיר</button>':'<button type="button" class="btn btn-ghost" data-act="admin-login">כניסת מנהל ראשי</button>'}`;
 }
 function forgotSheet(){
   const body=ME.owner
@@ -2040,7 +2041,7 @@ document.addEventListener('click',e=>{
       case 'skip-install': U.skipInstall=true; lsSet('inv-skip-install','1'); render(); return;
       case 'show-install': U.sheet={type:'install'}; renderSheet(); return;
       case 'retry': location.reload(); return;
-      case 'admin-login': U.adminLogin=true; render(); setTimeout(()=>{const n=$('#ad-email');if(n)n.focus();},50); return;
+      case 'admin-login': U.sheet=null; renderSheet(); U.adminLogin=true; render(); window.scrollTo(0,0); setTimeout(()=>{const n=$('#ad-email');if(n)n.focus();},50); return;
       case 'admin-back': U.adminLogin=false; render(); return;
       case 'admin-logout': arm(a,'להתנתק?',()=>{lsSet(LK('active'),null);if(FB)FB.signOut().catch(()=>{});}); return;
       case 'admin-relogin': if(FB){lsSet(LK('active'),null);lsSet('inv-admin-relogin','1');FB.signOut().catch(()=>{});} return;
