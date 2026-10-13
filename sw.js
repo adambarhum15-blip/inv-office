@@ -1,5 +1,5 @@
 /* service worker: offline start, phone notifications */
-const VERSION='20261013125012';
+const VERSION='20261013140403';
 const SHELL=['./','./app.js','./fb.js','./config.js','./seed.js','./manifest.webmanifest','./icon-192.png','./apple-touch-icon.png'];
 const BASE=new URL('./',self.registration.scope).pathname;
 const CDN=/^https:\/\/(fonts\.googleapis\.com\/|fonts\.gstatic\.com\/)/;
@@ -28,7 +28,7 @@ self.addEventListener('fetch',e=>{
   e.respondWith((async()=>{
     const c=await caches.open('shell-'+VERSION);
     try{
-      const res=await Promise.race([fetch(req),timeout(4000)]);
+      const res=await Promise.race([fetch(req,{cache:'no-cache'}),timeout(4000)]);
       if(res&&res.ok) c.put(key,res.clone());
       return res;
     }catch(err){

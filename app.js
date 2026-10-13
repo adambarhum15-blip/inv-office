@@ -1641,8 +1641,9 @@ function taskSheet(t){
     <p class="fulldesc">${esc(t.desc)}</p>
     <dl class="kv">${kv.map(([k,v])=>`<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
     <section class="logsec"><h4>${svg('lock')}יומן אירועים</h4><ol class="log">${log}</ol>
-      <p class="locknote">היומן נכתב אוטומטית עם חותמת זמן לכל שלב. כל אירוע נשמר אצל מי שביצע אותו ואף אחד אחר לא יכול לשנות אותו.</p></section>
-    ${act?`<div class="cact">${act}</div>`:''}`;
+      <p class="locknote">היומן נכתב אוטומטית עם חותמת זמן לכל שלב, והשרת לא מאפשר לשנות אותו. רק המנהל הראשי יכול למחוק משימה.</p></section>
+    ${act?`<div class="cact">${act}</div>`:''}
+    ${isAdmin()?`<button type="button" class="btn btn-danger" data-act="del-task" data-id="${esc(t.key)}">מחיקת המשימה</button>`:''}`;
 }
 function assigneeOptions(){
   const g=gridFor(curWeek()), d=todayIdx();
@@ -1987,6 +1988,16 @@ document.addEventListener('click',e=>{
       case 'sys-check': runSystemCheck(); return;
       case 'skip-import': U.skipImport=true; render(); return;
       case 'apk': return;
+      case 'del-task':{
+        const key=a.dataset.id; if(!isAdmin()||readOnly()) return;
+        arm(a,'למחוק לצמיתות? לחץ שוב לאישור',()=>{
+          const t=S.tasks.find(x=>x.key===key), num=t?t.id:'';
+          delete S.taskDocs[key]; delete S.taskOpen[key]; delete S.taskOld[key];
+          derive(); closeSheet(); render();
+          DB.doc('tasks/'+key).delete().then(()=>toast(`משימה #${num} נמחקה.`)).catch(err=>toast(errMsg(err)));
+          if(CFG.push) DB.doc('timers/esc-'+key).delete().catch(()=>{});
+        });
+        return;}
       case 'load-older': loadOlder((S.loadedFrom||Date.now())-30*D); return;
       /* sign-in */
       case 'pn-key': pnKey(a.dataset.k); return;
