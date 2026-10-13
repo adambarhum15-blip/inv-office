@@ -224,7 +224,7 @@ const tabsFor=role=>{
 const newId=()=>'e'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const isIOSDev=()=>/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const devLabel=()=>{const u=navigator.userAgent;if(/iPhone/.test(u))return 'iPhone';if(/iPad/.test(u)||isIOSDev())return 'iPad';const m=u.match(/Android[^;)]*;\s*([^;)]+?)(?:\s+Build|\))/);if(m&&m[1]&&!/^(K|wv)$/.test(m[1].trim()))return m[1].trim().slice(0,30);if(/Android/.test(u))return 'Android';if(/Windows/.test(u))return 'מחשב Windows';if(/Mac/.test(u))return 'Mac';return 'מכשיר';};
-const devText=u=>{const m=S.linkMeta[u];return m?`${m.dev||'מכשיר'}${m.at?' · חובר '+fmtDate(m.at):''}`:'מכשיר';};
+const devText=u=>{const m=S.linkMeta[u];return m?`${m.dev||'מכשיר'}${m.at?(m.via==='pn'?' · נכנס במספר אישי ':' · חובר ')+fmtDate(m.at):''}`:'מכשיר';};
 
 /* the tasks the app shows: everything still open, plus everything created in the last 35 days (older ones load on demand) */
 const RANK={open:0,progress:1,done:2};
@@ -535,7 +535,7 @@ function LocalDB(){
       try{store=JSON.parse(localStorage.getItem(KEY)||'{}');}catch(e){}
       const w=[];
       await fn({get:async p=>store[p]?clone(store[p]):null,
-        set:(p,d)=>{w.push(()=>{store[p]=clone(d);});},update:(p,d)=>{w.push(()=>{if(!store[p])throw {code:'not-found'};store[p]=merge(store[p],clone(d));});},delete:p=>{w.push(()=>{delete store[p];});}});
+        set:(p,d)=>{w.push(()=>{store[p]=clone(d);});},update:(p,d)=>{w.push(()=>{if(!store[p])throw {code:'not-found'};const o=clone(store[p]);Object.keys(d).forEach(k=>{const ks=k.split('.');let t=o;for(let i=0;i<ks.length-1;i++){t[ks[i]]=t[ks[i]]||{};t=t[ks[i]];}t[ks[ks.length-1]]=clone(d[k]);});store[p]=o;});},delete:p=>{w.push(()=>{delete store[p];});}});
       w.forEach(f=>f()); persist(); setTimeout(notify);
     };
     return navigator.locks&&navigator.locks.request?navigator.locks.request('inv-localdb-tx',run):run();
@@ -760,6 +760,18 @@ function lockHtml(){
   </div>`;
 }
 function setupHtml(){
+  if(AUTH.mode==='login'){
+    const wait=lockWait();
+    return `<div class="lock">
+      <div class="lk-top"><span class="lk-ic">${svg('lock')}</span><h2>כניסה: ${esc(name(AUTH.loginP))}</h2><p>הזן את המספר האישי שלך</p></div>
+      <div class="dots" id="pn-dots" role="status" aria-label="לא הוקלדו ספרות">${dotsHtml()}</div>
+      <p class="err" id="pn-err"${AUTH.err?'':' hidden'}>${esc(AUTH.err)}</p>
+      ${wait>0?`<p class="err">יותר מדי ניסיונות שגויים. אפשר לנסות שוב בעוד <span class="mono" id="pn-wait">${fmtWait(wait)}</span></p>`:''}
+      ${keysHtml()}
+      <button type="button" class="btn btn-primary" id="pn-ok" data-act="pn-ok"${AUTH.busy||AUTH.pad.length<PN_MIN?' disabled':''}>${AUTH.busy?'בודק…':'כניסה'}</button>
+      <div class="lk-foot"><p class="hint">זה לא השם שלך? חזור לרשימה.</p><button type="button" class="linkbtn" data-act="pn-cancel">חזרה לרשימת השמות</button></div>
+    </div>`;
+  }
   const mode=AUTH.mode||'set1', first=mode==='set1', nm=myName();
   const title=first?(AUTH.change?'מספר אישי חדש':'הזן את המספר האישי שלך'):'הקלד שוב לאימות';
   const sub=first?(AUTH.change?'הקלד את המספר האישי שישמש אותך מעכשיו לכניסה.':`${nm?`שלום ${esc(nm)}. `:''}מהפעם הבאה נכנסים איתו לאפליקציה.`):'כדי לוודא שלא הייתה טעות הקלדה.';
@@ -798,26 +810,74 @@ async function pnSubmit(){
     AUTH.busy=true; paintPad();
     let ok=false; try{ok=(await pnHash(v,S.auth.salt,S.auth.iter||HASH_ITER))===S.auth.hash;}catch(e){}
     AUTH.busy=false;
-    if(ok){unlockOk();return;}
+    if(ok){
+      unlockOk();
+      const me=!ME.owner&&S.member?S.links[ME.uid]:null;
+      if(me) DB.doc('keys/'+me).get().then(d=>{if(!d.exists)return makeCred(v).then(c=>saveCred(me,c));}).catch(()=>{});
+      return;
+    }
     const f=noteFail(); AUTH.pad='';
     AUTH.err=f.until>Date.now()?'':'מספר אישי שגוי. נסה שוב.';
     if(f.until>Date.now()) render(); else paintPad(true);
     return;
   }
+  if(AUTH.mode==='login') return loginSubmit(v);
   if((AUTH.mode||'set1')==='set1'){AUTH.first=v;AUTH.pad='';AUTH.mode='set2';AUTH.err='';render();return;}
   if(v!==AUTH.first){AUTH.first='';AUTH.pad='';AUTH.mode='set1';AUTH.err='המספרים לא תאמו. הקלד שוב מההתחלה.';render();paintPad(true);return;}
   AUTH.busy=true; render();
   try{
-    const salt=b64(rand(16)), hash=await pnHash(v,salt,HASH_ITER);
+    const salt=b64(rand(16)), hash=await pnHash(v,salt,HASH_ITER), cred=ME.owner?null:await makeCred(v);
     await saveAuth({type:'auth',v:1,alg:'sha256x',salt,hash,iter:HASH_ITER,len:v.length,setAt:Date.now(),bio:(AUTH.change&&S.auth&&S.auth.bio)||[]});
+    const mine=!ME.owner&&S.member?S.links[ME.uid]:null;
+    if(mine&&cred) saveCred(mine,cred).catch(()=>{});
     const pend=AUTH.pending, wasChange=AUTH.change;
     Object.assign(AUTH,{pending:null,mode:null,first:'',pad:'',busy:false,change:false,err:'',unlocked:true});
     lsSet(LK('active'),Date.now()); lsSet(LK('fails'),null);
-    if(pend) await sendClaim(pend);
+    if(pend) await sendClaim(cred?Object.assign({},pend,{cred}):pend);
     if(!wasChange&&!bioOnDevice()&&(await bioAvailable())) AUTH.bioOffer=true;
     render(); window.scrollTo(0,0);
     toast(wasChange?'המספר האישי הוחלף.':'המספר האישי נשמר.');
   }catch(err){Object.assign(AUTH,{busy:false,pad:'',first:'',mode:'set1'});render();toast(errMsg(err));}
+}
+/* ---------- signing in on another phone: name + personal number ----------
+   keys/{person} holds a public salt, vault/{person} the hash, which no phone can ever read. A new phone proves the number by
+   writing logins/{its id} with the hash; the server rules compare it with the vault and only then let the phone add itself to
+   team/links. The main admin sees every such sign-in in the notifications and can disconnect a phone. */
+async function makeCred(pn){const salt=b64(rand(16));return {salt,iter:HASH_ITER,h:await pnHash(pn,salt,HASH_ITER)};}
+function saveCred(person,cred){
+  if(!person||!cred) return Promise.resolve();
+  return Promise.all([DB.doc('keys/'+person).set({salt:cred.salt,iter:cred.iter,at:Date.now()}),DB.doc('vault/'+person).set({h:cred.h,at:Date.now()})]);
+}
+async function loginSubmit(v){
+  if(lockWait()>0) return;
+  const p=AUTH.loginP; AUTH.busy=true; render();
+  try{
+    const k=await DB.doc('keys/'+p).get();
+    if(!k.exists){
+      Object.assign(AUTH,{mode:hasPN()?null:'set1',pending:hasPN()?null:{person:p},loginP:null,busy:false,pad:'',first:'',err:''});
+      if(hasPN()) sendClaim({person:p});
+      render(); toast('לשם הזה עוד אין כניסה במספר אישי. '+(hasPN()?'נשלחה בקשה למנהל.':'הגדר מספר אישי והבקשה תישלח למנהל.'));
+      return;
+    }
+    const kd=k.data(), h=await pnHash(v,kd.salt,kd.iter||HASH_ITER), now=Date.now(), dev=devLabel();
+    if(window.__LOCAL===true){const vt=await DB.doc('vault/'+p).get();if(!vt.exists||vt.data().h!==h)throw {code:'permission-denied'};}
+    await DB.tx(async t=>{
+      t.set('logins/'+ME.uid,{person:p,proof:h,at:now,dev});
+      t.update('team/links',{['map.'+ME.uid]:p,['ever.'+ME.uid]:p,['meta.'+ME.uid]:{dev,at:now,via:'pn'}});
+    });
+    const salt=b64(rand(16)), hash=await pnHash(v,salt,HASH_ITER);
+    await saveAuth({type:'auth',v:1,alg:'sha256x',salt,hash,iter:HASH_ITER,len:v.length,setAt:now,bio:[]});
+    Object.assign(AUTH,{mode:null,loginP:null,pad:'',first:'',busy:false,err:'',unlocked:true});
+    lsSet(LK('active'),now); lsSet(LK('fails'),null);
+    if(!bioOnDevice()&&(await bioAvailable())) AUTH.bioOffer=true;
+    subscribeAll(); render(); window.scrollTo(0,0);
+    toast(`נכנסת בתור ${name(p)}.`);
+  }catch(e){
+    AUTH.busy=false; AUTH.pad='';
+    if(isDenied(e)){const f=noteFail();AUTH.err=f.until>Date.now()?'':'מספר אישי שגוי. נסה שוב.';}
+    else AUTH.err=errMsg(e);
+    render(); paintPad(true);
+  }
 }
 async function sendClaim(body){
   const b=Object.assign({},body,{at:Date.now(),dev:devLabel()});
@@ -1011,6 +1071,7 @@ function notifItems(){
     });
   }
   if(isAdmin()) pendingClaims().forEach(u=>{const c=S.claims[u];out.push({key:'claim:'+u+':'+c.at,kind:'claim',at:c.at||0,uid:u,label:claimLabel(c),isNew:!c.person});});
+  if(isAdmin()) Object.keys(S.linkMeta).forEach(u=>{const m=S.linkMeta[u];if(m&&m.via==='pn'&&!m.test&&S.links[u])out.push({key:'login:'+u+':'+m.at,kind:'login',at:m.at||0,uid:u,label:name(S.links[u]),dev:m.dev||''});});
   resetReqs().forEach(u=>{const at=S.authOf[u].resetReq;out.push({key:'reset:'+u+':'+at,kind:'reset',at,uid:u,label:name(S.links[u])});});
   if(me){
     const r=RP[me];
@@ -1026,6 +1087,7 @@ function notifText(n){
     const mine=g&&g[n.to]?g[n.to].map((c,d)=>`${DSH[d]} ${c?SH[c].l:'—'}`).join(' · '):'';
     return {title:`${n.upd?'עדכון בסידור העבודה':'סידור עבודה פורסם'} · ${range}`,body:mine?`המשמרות שלך: ${mine}`:''};
   }
+  if(n.kind==='login') return {title:`כניסה מטלפון חדש: ${n.label}`,body:`${n.dev||'מכשיר'} · אם זה לא הוא, נתק את הטלפון בדף הצוות.`};
   if(n.kind==='reset') return {title:`שכח מספר אישי: ${n.label}`,body:'וודא מולו שזה הוא, ואז אפס את הכניסה שלו בדף הצוות.'};
   if(n.kind==='claim') return n.isNew?{title:`בקשת הצטרפות: ${n.label}`,body:'השם לא ברשימה. הוסף אותו לצוות וקבע לו כללים.'}:{title:`בקשת הצטרפות: ${n.label}`,body:'מישהו ביקש להתחבר בשם הזה. אשר או דחה בדף הצוות.'};
   const t=S.tasks.find(x=>x.key===n.task); const short=t?trunc(t.desc,96):'';
@@ -1050,7 +1112,7 @@ function showPush(n){
   el.innerHTML=`<span class="appicon" aria-hidden="true">מ</span><span class="pb"><span class="app"><span>משימות · התראה</span><span>${ago(n.at)}</span></span><strong>${esc(title)}</strong><span>${esc(body)}</span></span>`;
   ['data-open','data-act','data-week'].forEach(a=>el.removeAttribute(a));
   if(n.kind==='sched'){el.dataset.act='open-week';el.dataset.week=n.week;}
-  else if(n.kind==='claim'||n.kind==='reset'){el.dataset.act='team';}
+  else if(n.kind==='claim'||n.kind==='reset'||n.kind==='login'){el.dataset.act='team';}
   else el.dataset.open=n.task;
   el.hidden=false;
   clearTimeout(pushTimer); pushTimer=setTimeout(()=>{el.hidden=true;},6000);
@@ -1196,9 +1258,9 @@ function gateHtml(){
   if(pub.missing||!(pub.people||[]).length) return `<div class="gate"><h2>הצוות עוד לא הוגדר</h2><p>המנהל עדיין מכין את האפליקציה. נסה שוב בעוד כמה דקות.</p>${adminLink}</div>`;
   const taken=new Set(pub.taken||[]);
   const groups=[['B','סידור צפוני'],['C','סידור רגיל'],['S','סטטוס מיוחד'],['A','קצינים ומטה']];
-  return `<div class="gate"><h2>מי אתה?</h2><p>${hasPN()?'בחר את השם שלך. המנהל יאשר את החיבור פעם אחת, ומאותו רגע המשימות והסידור שלך יופיעו כאן.':'בחר את השם שלך ואז הזן את המספר האישי שלך. המנהל יאשר את החיבור פעם אחת, ומהפעם הבאה נכנסים עם המספר האישי.'}</p>
-    ${groups.map(([gk,gl])=>{const ps=pub.people.filter(r=>r.grp===gk);return ps.length?`<h3 class="sec">${gl}</h3><div class="pick">${ps.map(r=>`<button type="button" data-act="claim" data-p="${esc(r.id)}"${taken.has(r.id)?' disabled':''}>${esc(r.name)}</button>`).join('')}</div>`:'';}).join('')}
-    <p class="hint">שם שכבר מחובר לטלפון אחר מופיע באפור. החלפת טלפון? בחר את השם מהרשימה אחרי שהמנהל ינתק את הישן.</p>
+  return `<div class="gate"><h2>מי אתה?</h2><p>בחר את השם שלך. <b>כבר נרשמת?</b> מזינים רק את המספר האישי ונכנסים. <b>פעם ראשונה?</b> מגדירים מספר אישי, והמנהל מאשר פעם אחת.</p>
+    ${groups.map(([gk,gl])=>{const ps=pub.people.filter(r=>r.grp===gk);return ps.length?`<h3 class="sec">${gl}</h3><div class="pick">${ps.map(r=>taken.has(r.id)?`<button type="button" class="known" data-act="login-as" data-p="${esc(r.id)}">${esc(r.name)}<small>רשום · כניסה</small></button>`:`<button type="button" data-act="claim" data-p="${esc(r.id)}">${esc(r.name)}</button>`).join('')}</div>`:'';}).join('')}
+    <p class="hint">שמות שמסומנים "רשום" כבר נרשמו. בוחרים אותם כדי להיכנס מטלפון חדש או מהאייקון במסך הבית.</p>
     <button type="button" class="addbtn" data-act="newme">${svg('plus')}השם שלי לא ברשימה</button>
     ${adminLink}</div>`;
 }
@@ -1602,9 +1664,9 @@ function csv(list){
 function viewNotifs(){
   const list=notifItems(), ls=lastSeen();
   const sub=isAdmin()?'משימות שבוצעו, חריגות, בקשות הצטרפות ואיפוס מספר אישי.':'משימות חדשות ופרסומי סידור עבודה.';
-  const ic={new:'bell',done:'check',esc:'alert',sched:'calendar',claim:'users',reset:'lock'};
+  const ic={new:'bell',done:'check',esc:'alert',sched:'calendar',claim:'users',reset:'lock',login:'users'};
   const items=list.map(n=>{const {title,body}=notifText(n);
-    const attr=n.kind==='sched'?`data-act="open-week" data-week="${n.week}"`:(n.kind==='claim'||n.kind==='reset')?'data-act="team"':`data-open="${n.task}"`;
+    const attr=n.kind==='sched'?`data-act="open-week" data-week="${n.week}"`:(n.kind==='claim'||n.kind==='reset'||n.kind==='login')?'data-act="team"':`data-open="${n.task}"`;
     return `<li><button type="button" class="notif${n.at>ls?' unread':''}" ${attr}>
     <span class="nic ${n.kind}">${svg(ic[n.kind])}</span><span class="nb"><strong><span>${esc(title)}</span><time>${ago(n.at)}</time></strong><p>${esc(body)}</p></span></button></li>`;}).join('');
   return `<div class="vhead"><div><h2>התראות</h2><p class="sub">${sub}</p></div></div>
@@ -1725,9 +1787,10 @@ function rulesSheet(){
 function teamSheet(){
   const claims=pendingClaims();
   const byPerson={}; Object.keys(S.links).forEach(u=>{byPerson[S.links[u]]=u;});
+  const devsOf=pid=>Object.keys(S.links).filter(u=>S.links[u]===pid);
   const pend=claims.map(u=>{const c=S.claims[u];
     if(c.person){const clash=byPerson[c.person];
-      return `<li class="trow pending"><span class="tt"><span class="tn">מבקש להתחבר בתור ${esc(name(c.person))}</span><span class="ts">${esc(c.dev||'מכשיר')} · ${ago(c.at||Date.now())}${clash?' · יחליף את המכשיר המחובר כעת':''}</span></span>
+      return `<li class="trow pending"><span class="tt"><span class="tn">מבקש להתחבר בתור ${esc(name(c.person))}</span><span class="ts">${esc(c.dev||'מכשיר')} · ${ago(c.at||Date.now())}${clash?' · יתווסף לטלפונים שכבר מחוברים לו':''}</span></span>
       <span class="ta"><button type="button" class="btn btn-primary btn-sm" data-act="approve" data-u="${esc(u)}">אישור</button><button type="button" class="btn btn-ghost btn-sm" data-act="reject" data-u="${esc(u)}">דחייה</button></span></li>`;}
     return `<li class="trow pending"><span class="tt"><span class="tn">${esc(c.newName)} · לא ברשימה</span><span class="ts">${esc(c.dev||'מכשיר')} · ${ago(c.at||Date.now())}${c.note?` · ${esc(c.note)}`:''}</span></span>
       <span class="ta"><button type="button" class="btn btn-primary btn-sm" data-act="add-from-claim" data-u="${esc(u)}">הוספה לצוות</button><button type="button" class="btn btn-ghost btn-sm" data-act="reject" data-u="${esc(u)}">דחייה</button></span></li>`;
@@ -1736,9 +1799,9 @@ function teamSheet(){
   const resets=resetReqs().map(u=>`<li class="trow pending"><span class="tt"><span class="tn">${esc(name(S.links[u]))} שכח את המספר האישי</span><span class="ts">ביקש איפוס ${ago(S.authOf[u].resetReq)} · וודא מולו שזה הוא לפני האיפוס</span></span>
       <span class="ta"><button type="button" class="btn btn-primary btn-sm" data-act="reset-pn" data-u="${esc(u)}">איפוס</button><button type="button" class="btn btn-ghost btn-sm" data-act="reset-ignore" data-u="${esc(u)}">התעלמות</button></span></li>`).join('');
   const loginTag=u=>{const d=S.authOf[u];if(!d||!d.hash)return '<span class="tlink off">טרם הגדיר מספר אישי</span>';return `<span class="tlink on">${(d.bio||[]).length?'מספר אישי + זיהוי ביומטרי':'מספר אישי'}</span>`;};
-  const row=r=>{const u=byPerson[r.id], m=permOf(r.id), mt=[m.tasks?'שליחת משימות':'',m.sched?'סידור עבודה':''].filter(Boolean).join(' · ');
-    return `<li class="trow"><span class="tt"><span class="tn">${esc(r.name)} ${own?`<span class="tlink ${u?'on':'off'}">${u?'מחובר':'לא מחובר'}</span>`:''}${mt?` <span class="tlink on">מנהל: ${esc(mt)}</span>`:''}</span><span class="ts">${esc(personRules(r).join(' · '))}${r.notes?` · ${esc(r.notes)}`:''}</span>${own&&u?`<span class="ts">${esc(devText(u))} ${loginTag(u)}</span>`:''}</span>
-      ${own?`<span class="ta"><button type="button" class="btn btn-ghost btn-sm" data-act="edit-person" data-p="${r.id}">עריכה</button>${u?`<button type="button" class="btn btn-ghost btn-sm" data-act="unlink" data-u="${esc(u)}">ניתוק</button>`:''}${u&&S.authOf[u]&&S.authOf[u].hash?`<button type="button" class="btn btn-ghost btn-sm" data-act="reset-pn" data-u="${esc(u)}">איפוס כניסה</button>`:''}</span>`:''}</li>`;};
+  const row=r=>{const us=devsOf(r.id), u=us[0], m=permOf(r.id), mt=[m.tasks?'שליחת משימות':'',m.sched?'סידור עבודה':''].filter(Boolean).join(' · ');
+    return `<li class="trow"><span class="tt"><span class="tn">${esc(r.name)} ${own?`<span class="tlink ${u?'on':'off'}">${u?'מחובר':'לא מחובר'}</span>`:''}${mt?` <span class="tlink on">מנהל: ${esc(mt)}</span>`:''}</span><span class="ts">${esc(personRules(r).join(' · '))}${r.notes?` · ${esc(r.notes)}`:''}</span>${own?us.map(x=>`<span class="ts">${esc(devText(x))} ${loginTag(x)} <button type="button" class="linkbtn mini" data-act="unlink" data-u="${esc(x)}">ניתוק</button></span>`).join(''):''}</span>
+      ${own?`<span class="ta"><button type="button" class="btn btn-ghost btn-sm" data-act="edit-person" data-p="${r.id}">עריכה</button>${(()=>{const x=us.find(z=>S.authOf[z]&&S.authOf[z].hash);return x?`<button type="button" class="btn btn-ghost btn-sm" data-act="reset-pn" data-u="${esc(x)}">איפוס כניסה</button>`:'';})()}</span>`:''}</li>`;};
   if(!own) return `<div class="grab"></div>
     <div class="phead"><h3 class="ptitle" id="sheet-title">הצוות וכללי השיבוץ</h3><button type="button" class="x" data-act="close" aria-label="סגירה">${svg('x')}</button></div>
     <p class="hint">רק המנהל הראשי מוסיף אנשים, מאשר גישה ומשנה כללים והרשאות.</p>
@@ -2003,7 +2066,8 @@ document.addEventListener('click',e=>{
       case 'pn-key': pnKey(a.dataset.k); return;
       case 'pn-del': pnDel(); return;
       case 'pn-ok': pnSubmit(); return;
-      case 'pn-cancel': Object.assign(AUTH,{mode:null,pending:null,change:false,pad:'',first:'',err:''}); render(); return;
+      case 'pn-cancel': Object.assign(AUTH,{mode:null,pending:null,change:false,loginP:null,pad:'',first:'',err:''}); render(); return;
+      case 'login-as': Object.assign(AUTH,{mode:'login',loginP:a.dataset.p,pending:null,pad:'',first:'',err:''}); U.reclaim=false; render(); window.scrollTo(0,0); return;
       case 'pn-forgot': pnForgot(); return;
       case 'reset-req': sendResetReq(); return;
       case 'bio-unlock': bioUnlock(false); return;
@@ -2017,6 +2081,7 @@ document.addEventListener('click',e=>{
         const u=a.dataset.u; if(!isAdmin()) return;
         arm(a,'לאפס?',()=>{
           delete S.authOf[u]; renderSheet();
+          const rp=S.links[u]; if(rp){DB.doc('vault/'+rp).delete().catch(()=>{});DB.doc('keys/'+rp).delete().catch(()=>{});}
           DB.doc(`data/users/${u}/auth`).delete().then(()=>toast(`הכניסה של ${name(S.links[u]||S.everLinked[u])} אופסה. בפתיחה הבאה הוא יגדיר מספר אישי חדש.`)).catch(err=>toast(errMsg(err)));
         });
         return;}
@@ -2034,11 +2099,12 @@ document.addEventListener('click',e=>{
       case 'add-from-claim': U.sheet={type:'person',id:null,uid:a.dataset.u}; renderSheet(); return;
       case 'approve':{
         const u=a.dataset.u, c=S.claims[u]; if(!c||!c.person) return;
-        const map=Object.assign({},S.links); Object.keys(map).forEach(k=>{if(map[k]===c.person)delete map[k];}); map[u]=c.person;
+        const map=Object.assign({},S.links,{[u]:c.person});
         const ever=Object.assign({},S.everLinked,{[u]:c.person});
         const meta=Object.assign({},S.linkMeta,{[u]:{dev:c.dev||'',at:Date.now()}});
+        const rest=Object.assign({},c); delete rest.cred;
         delete S.claims[u]; renderSheet();
-        saveLinks(map,ever,meta).then(()=>DB.doc('claims/'+u).set(Object.assign({},c,{approved:true,approvedAt:Date.now()}))).then(()=>toast(`${name(c.person)} חובר לאפליקציה.`)).catch(err=>toast(errMsg(err)));
+        saveLinks(map,ever,meta).then(()=>saveCred(c.person,c.cred)).then(()=>DB.doc('claims/'+u).set(Object.assign(rest,{approved:true,approvedAt:Date.now()}))).then(()=>toast(`${name(c.person)} חובר לאפליקציה.`)).catch(err=>toast(errMsg(err)));
         return;}
       case 'reject':{const u=a.dataset.u; delete S.claims[u]; renderSheet(); DB.doc('claims/'+u).delete().catch(err=>toast(errMsg(err))); return;}
       case 'unlink':{
@@ -2161,8 +2227,9 @@ document.addEventListener('submit',async e=>{
         const map=Object.assign({},S.links); map[uid]=id;
         const ever=Object.assign({},S.everLinked,{[uid]:id});
         const c=S.claims[uid]||{}, meta=Object.assign({},S.linkMeta,{[uid]:{dev:c.dev||'',at:Date.now()}});
+        const rest=Object.assign({},c); delete rest.cred;
         delete S.claims[uid];
-        jobs.push(saveLinks(map,ever,meta).then(()=>DB.doc('claims/'+uid).set(Object.assign({},c,{approved:true,approvedAt:Date.now()}))));
+        jobs.push(saveLinks(map,ever,meta).then(()=>saveCred(id,c.cred)).then(()=>DB.doc('claims/'+uid).set(Object.assign(rest,{approved:true,approvedAt:Date.now()}))));
       }
       U.sheet={type:'team'}; renderSheet(); render();
       await Promise.all(jobs);
@@ -2338,8 +2405,15 @@ async function runSystemCheck(){
     await expect('טלפון לא מאושר לא יכול לאשר את עצמו','deny',()=>P.db.doc('claims/'+pu).set({person:PID,at:ts,approved:true}));
     await expect('טלפון לא מאושר לא כותב משימות','deny',()=>P.db.doc('tasks/'+tkey).set({num:1,desc:'x'}));
     await expect('טלפון לא מאושר לא מצרף את עצמו לצוות','deny',()=>P.db.doc('team/links').set({map:{[pu]:PID}}));
-    await DB.doc('team/links').update({['map.'+pu]:PID});
+    /* sign-in from a new phone: the server compares the number's hash with the vault, which no phone can read */
+    const pc=await makeCred('24680'), wrong=await pnHash('11111',pc.salt,pc.iter);
+    await DB.doc('keys/'+PID).set({salt:pc.salt,iter:pc.iter,at:ts}); await DB.doc('vault/'+PID).set({h:pc.h,at:ts});
+    const selfLink=proof=>P.db.tx(async t=>{t.set('logins/'+pu,{person:PID,proof,at:Date.now(),dev:'בדיקה'});t.update('team/links',{['map.'+pu]:PID,['ever.'+pu]:PID,['meta.'+pu]:{dev:'בדיקה',at:Date.now(),via:'pn',test:true}});});
+    await expect('טלפון לא יכול לקרוא את המספרים האישיים המוצפנים','deny',()=>P.db.doc('vault/'+PID).get());
+    await expect('כניסה עם מספר אישי שגוי נחסמת','deny',()=>selfLink(wrong));
+    await expect('כניסה עם מספר אישי נכון מצרפת את הטלפון','allow',()=>selfLink(pc.h));
     await sleep(700);
+    await expect('טלפון מחובר לא יכול לצרף טלפון אחר','deny',()=>P.db.doc('team/links').update({['map.zz'+ts]:PID}));
     await expect('טלפון מאושר רואה את הצוות','allow',()=>P.db.doc('team/roster').get());
     await expect('טלפון מאושר רואה משימות','allow',()=>P.db.collection('tasks').limit(1).get());
     await expect('חוקר לא יוצר משימות','deny',()=>P.db.doc('tasks/'+tkey+'x').set({num:1,desc:'בדיקה',prio:'low',assignee:null,createdAt:Date.now(),createdBy:PID,status:'open',takenBy:null,takenAt:null,doneAt:null,test:true}));
@@ -2364,9 +2438,11 @@ async function runSystemCheck(){
   const jobs=[`tasks/${tkey}`,`tasks/${tkey}m`,`tasks/${tkey}n`,`tasks/${tkey}x`,`sched/${wk}`,`outbox/${tkey}`].map(p=>DB.doc(p).delete().catch(()=>{}));
   if(P){
     jobs.push(DB.doc('claims/'+P.uid).delete().catch(()=>{}), DB.doc(`data/users/${P.uid}/r-test`).delete().catch(()=>{}),
-      DB.doc('team/links').update({['map.'+P.uid]:DB.fieldDelete()}).catch(()=>{}));
+      DB.doc('team/links').update({['map.'+P.uid]:DB.fieldDelete(),['ever.'+P.uid]:DB.fieldDelete(),['meta.'+P.uid]:DB.fieldDelete()}).catch(()=>{}),
+      DB.doc('logins/'+P.uid).delete().catch(()=>{}));
   }
-  jobs.push(DB.doc('team/perms').update({['managers.'+PID]:DB.fieldDelete()}).catch(()=>{}));
+  jobs.push(DB.doc('team/perms').update({['managers.'+PID]:DB.fieldDelete()}).catch(()=>{}),
+    DB.doc('keys/'+PID).delete().catch(()=>{}), DB.doc('vault/'+PID).delete().catch(()=>{}));
   if(pnum) jobs.push(DB.tx(async t=>{const c=await t.get('meta/counter');if(c&&c.n===pnum)t.set('meta/counter',{n:pnum-1});}).catch(()=>{}));
   await Promise.all(jobs);
   if(P) await P.del();

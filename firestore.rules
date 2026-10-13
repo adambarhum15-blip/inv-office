@@ -31,6 +31,36 @@ service cloud.firestore {
     match /team/{doc} {
       allow read: if member();
       allow write: if isAdmin();
+      allow update: if doc == 'links' && selfLink();
+    }
+    // a registered person signing in on another phone: the phone may add only itself, and only after proving the number
+    function selfLink() {
+      let o = resource.data;
+      let d = request.resource.data;
+      let p = d.map[me()];
+      let login = /databases/$(db)/documents/logins/$(me());
+      return authed() && !(me() in o.map) && p is string
+        && d.diff(o).affectedKeys().hasOnly(['map', 'ever', 'meta'])
+        && d.map.diff(o.map).affectedKeys().hasOnly([me()])
+        && d.get('ever', {}).diff(o.get('ever', {})).affectedKeys().hasOnly([me()])
+        && d.get('meta', {}).diff(o.get('meta', {})).affectedKeys().hasOnly([me()])
+        && existsAfter(login) && getAfter(login).data.person == p
+        && getAfter(login).data.proof == get(/databases/$(db)/documents/vault/$(p)).data.h;
+    }
+    // per person: a public salt, and the hash of the personal number, which no phone can read
+    match /keys/{p} {
+      allow read: if authed();
+      allow write: if isAdmin() || (linked() && person() == p);
+    }
+    match /vault/{p} {
+      allow read: if false;
+      allow write: if isAdmin() || (linked() && person() == p);
+    }
+    match /logins/{u} {
+      allow read: if isAdmin() || (authed() && me() == u);
+      allow create, update: if authed() && me() == u && request.resource.data.person is string
+        && request.resource.data.proof == get(/databases/$(db)/documents/vault/$(request.resource.data.person)).data.h;
+      allow delete: if isAdmin();
     }
     // task numbers: managers may only move the counter forward by one, inside the transaction that creates the task
     match /meta/counter {
