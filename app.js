@@ -1259,10 +1259,28 @@ function gateHtml(){
   if(pub.missing||!(pub.people||[]).length) return `<div class="gate"><h2>הצוות עוד לא הוגדר</h2><p>המנהל עדיין מכין את האפליקציה. נסה שוב בעוד כמה דקות.</p>${adminLink}</div>`;
   const taken=new Set(pub.taken||[]);
   const groups=[['B','סידור צפוני'],['C','סידור רגיל'],['S','סטטוס מיוחד'],['A','קצינים ומטה']];
-  return `<div class="gate"><h2>מי אתה?</h2><p>בחר את השם שלך. <b>כבר נרשמת?</b> מזינים רק את המספר האישי ונכנסים. <b>פעם ראשונה?</b> מגדירים מספר אישי, והמנהל מאשר פעם אחת.</p>
-    ${groups.map(([gk,gl])=>{const ps=pub.people.filter(r=>r.grp===gk);return ps.length?`<h3 class="sec">${gl}</h3><div class="pick">${ps.map(r=>taken.has(r.id)?`<button type="button" class="known" data-act="login-as" data-p="${esc(r.id)}">${esc(r.name)}<small>רשום · כניסה</small></button>`:`<button type="button" data-act="claim" data-p="${esc(r.id)}">${esc(r.name)}</button>`).join('')}</div>`:'';}).join('')}
-    <p class="hint">שמות שמסומנים "רשום" כבר נרשמו. בוחרים אותם כדי להיכנס מטלפון חדש או מהאייקון במסך הבית.</p>
-    <button type="button" class="addbtn" data-act="newme">${svg('plus')}השם שלי לא ברשימה</button>
+  const list=(keep,act)=>groups.map(([gk,gl])=>{const ps=pub.people.filter(r=>r.grp===gk&&keep(r));return ps.length?`<h3 class="sec">${gl}</h3><div class="pick">${ps.map(r=>`<button type="button" data-act="${act}" data-p="${esc(r.id)}">${esc(r.name)}</button>`).join('')}</div>`:'';}).join('');
+  const back=`<button type="button" class="linkbtn" data-act="entry-back">חזרה</button>`;
+  /* sign in: only people who already registered */
+  if(U.entry==='login'){
+    const any=pub.people.some(r=>taken.has(r.id));
+    return `<div class="gate"><h2>כניסה</h2><p>בחר את השם שלך ואז הזן את המספר האישי.</p>
+      ${any?list(r=>taken.has(r.id),'login-as'):'<div class="empty">עוד אין משתמשים רשומים. אם זו הפעם הראשונה שלך, חזור ובחר "הרשמה".</div>'}
+      ${back}</div>`;
+  }
+  /* register: only people who have not registered yet */
+  if(U.entry==='register'){
+    const any=pub.people.some(r=>!taken.has(r.id));
+    return `<div class="gate"><h2>הרשמה</h2><p>בחר את השם שלך והגדר מספר אישי. המנהל יאשר אותך פעם אחת, ומאז נכנסים עם המספר האישי.</p>
+      ${any?list(r=>!taken.has(r.id),'claim'):'<div class="empty">כל השמות ברשימה כבר רשומים. מי שכבר נרשם בוחר "כניסה".</div>'}
+      <button type="button" class="addbtn" data-act="newme">${svg('plus')}השם שלי לא ברשימה</button>
+      ${back}</div>`;
+  }
+  return `<div class="gate entry">
+    <div class="entry-top"><img class="appicon-lg" src="./icon-192.png" alt="" width="72" height="72"><h2>משימות</h2><p>משרד החקירות</p></div>
+    <button type="button" class="btn btn-primary" data-act="entry" data-e="login">כניסה</button>
+    <button type="button" class="btn btn-ghost" data-act="entry" data-e="register">הרשמה</button>
+    <p class="hint">כניסה: למי שכבר נרשם. הרשמה: בפעם הראשונה.</p>
     ${adminLink}</div>`;
 }
 
@@ -2068,6 +2086,8 @@ document.addEventListener('click',e=>{
       case 'pn-del': pnDel(); return;
       case 'pn-ok': pnSubmit(); return;
       case 'pn-cancel': Object.assign(AUTH,{mode:null,pending:null,change:false,loginP:null,pad:'',first:'',err:''}); render(); return;
+      case 'entry': U.entry=a.dataset.e; render(); window.scrollTo(0,0); return;
+      case 'entry-back': U.entry=null; U.newMe=false; render(); window.scrollTo(0,0); return;
       case 'login-as': Object.assign(AUTH,{mode:'login',loginP:a.dataset.p,pending:null,pad:'',first:'',err:''}); U.reclaim=false; render(); window.scrollTo(0,0); return;
       case 'pn-forgot': pnForgot(); return;
       case 'reset-req': sendResetReq(); return;
