@@ -11,6 +11,10 @@ const ALL_SHIFTS=['A','AC','MS','M','K','KC'];
 const DEFAULT_PEOPLE=(window.__LOCAL===true&&window.__SEED_PEOPLE)||[];
 const ANCHOR='2026-01-04';
 const DEPTS=[{id:'general',name:'כללי'},{id:'crimes',name:'פשעים'},{id:'youth',name:'נוער'},{id:'dv',name:'אלמ"ב'}];
+/* investigation teams, in the order they appear in the schedule; each may have one team leader (ר"צ) */
+const TEAMS=[{id:'crimes',name:'פשעים'},{id:'general',name:'כללי'},{id:'youth',name:'נוער'},{id:'dv',name:'משפחה'}];
+/* one-time roster updates applied by the main admin's phone (ids only, no personal data) */
+const ROSTER_PATCHES=[{id:'team-leads-1',set:{u1:{team:'crimes',lead:true},u6:{team:'general',lead:true},u5:{team:'youth',lead:true},u11:{team:'dv',lead:true}}}];
 const PRIO={high:{name:'גבוהה',rank:3},med:{name:'בינונית',rank:2},low:{name:'נמוכה',rank:1}};
 const STATUS={open:'פתוחה',progress:'בביצוע',done:'בוצעה'};
 const FIELDS=[
@@ -74,6 +78,8 @@ function normPerson(p){
   if(r.kind==='absent') r.status=['LEAVE','COURSE'].includes(r.status)?r.status:'LEAVE';
   r.tasks=r.tasks===undefined?(r.kind==='rot'||r.kind==='manual'):!!r.tasks;
   r.notes=typeof r.notes==='string'?r.notes:'';
+  r.team=TEAMS.some(t=>t.id===r.team)?r.team:null;
+  r.lead=!!(r.lead&&r.team);
   return r;
 }
 function setRoster(list){
@@ -920,9 +926,16 @@ async function savePerms(person,next){
   S.perms={managers}; derive();
   await serial('perms',()=>withRetry(()=>DB.doc('team/perms').set({managers,updatedAt:Date.now()})));
 }
+function applyRosterPatches(){
+  if(!ME.owner||!DB||!S.ready.roster||!S.rosterDoc) return;
+  const done=new Set(S.rosterPatches||[]), todo=ROSTER_PATCHES.filter(x=>!done.has(x.id));
+  if(!todo.length) return;
+  S.rosterPatches=[...done].concat(todo.map(x=>x.id));
+  saveRoster(rosterList().map(p=>{const o=Object.assign({},p);todo.forEach(x=>{if(x.set[p.id])Object.assign(o,x.set[p.id]);});return o;})).catch(()=>{});
+}
 function saveRoster(list){
   setRoster(list);
-  const body={people:list.map(p=>{const o=clone(p);Object.keys(o).forEach(k=>{if(o[k]===undefined)delete o[k];});return o;}),updatedAt:Date.now()};
+  const body={people:list.map(p=>{const o=clone(p);Object.keys(o).forEach(k=>{if(o[k]===undefined)delete o[k];});return o;}),patches:S.rosterPatches||[],updatedAt:Date.now()};
   publishNames();
   return serial('roster',()=>withRetry(()=>DB.doc('team/roster').set(body)));
 }
@@ -1378,6 +1391,23 @@ function cellCode(W,g,r,d){
   return null;
 }
 const GROUPS=[['B','סידור צפוני'],['C','סידור רגיל'],['S','סטטוס מיוחד'],['A','קצינים ומטה · לא נספרים בתקן']];
+/* rows grouped by team: the team leader (ר"צ) first, then the team; then people without a team; officers last */
+function rosterGroups(){
+  const out=[];
+  TEAMS.forEach(t=>{
+    const ps=PEOPLE.filter(p=>p.kind!=='staff'&&p.team===t.id);
+    if(!ps.length) return;
+    const lead=ps.find(p=>p.lead);
+    const ordered=lead?[lead].concat(ps.filter(p=>p!==lead)):ps;
+    out.push([`צוות ${t.name}${lead?` · ר"צ ${lead.name}`:''}`,ordered]);
+  });
+  const none=PEOPLE.filter(p=>p.kind!=='staff'&&!p.team);
+  if(none.length) out.push([out.length?'ללא צוות':'חוקרים',none]);
+  const staff=PEOPLE.filter(p=>p.kind==='staff');
+  if(staff.length) out.push(['קצינים ומטה · לא נספרים בתקן',staff]);
+  return out;
+}
+const leadTag=r=>r.lead?'<small class="rz">ר"צ</small>':'';
 function gridHtml(wk,g,o){
   const ctx=weekCtx(wk), W=ctx.W;
   const ti=wk===curWeek()?todayIdx():-1;
@@ -1398,9 +1428,9 @@ function gridHtml(wk,g,o){
       const aria=`${r.name}, ${DAYS[d]}: ${sh?sh.n:'לא משובץ'}`;
       return `<td>${o.editable?`<button type="button" class="${cls}" data-act="cell" data-p="${r.id}" data-d="${d}" aria-label="${esc(aria)}">${inner}</button>`:`<span class="${cls}" aria-label="${esc(aria)}">${inner}</span>`}</td>`;
     }).join('');
-    return `<tr class="${r.id===o.me?'me':''}"><th class="nm" scope="row">${ctx.tri.includes(r.id)?'<i class="tri" aria-hidden="true"></i>':''}<span>${esc(r.name)}</span></th>${cells}</tr>`;
+    return `<tr class="${r.id===o.me?'me':''}${r.lead?' lead':''}"><th class="nm" scope="row">${ctx.tri.includes(r.id)?'<i class="tri" aria-hidden="true"></i>':''}<span>${esc(r.name)}</span>${leadTag(r)}</th>${cells}</tr>`;
   };
-  const body=GROUPS.map(([gk,gl])=>{const ps=PEOPLE.filter(r=>grpOf(r)===gk);return ps.length?`<tr class="grp"><th colspan="8" scope="colgroup">${gl}</th></tr>`+ps.map(row).join(''):'';}).join('');
+  const body=rosterGroups().map(([gl,ps])=>`<tr class="grp"><th colspan="8" scope="colgroup">${esc(gl)}</th></tr>`+ps.map(row).join('')).join('');
   return `<div class="gridwrap"><table class="sched"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
 }
 function legendHtml(admin){
@@ -1546,7 +1576,7 @@ function viewReport(){
       <button type="button" class="btn btn-ghost" data-act="report-edit">עדכון הדיווח</button>
       <p class="hint">הדיווח גלוי רק לך ולמנהל. בסיכום היומי הנתונים מוצגים לפי מחלק, ללא שמות.</p>`;
   }
-  const dr=U.draft||(U.draft=Object.assign({dept:(mine&&mine.dept)||(last&&last.dept)||'general'},Object.fromEntries(FIELDS.map(([k])=>[k,mine?mine[k]:0]))));
+  const dr=U.draft||(U.draft=Object.assign({dept:(mine&&mine.dept)||(last&&last.dept)||((RP[viewer()]||{}).team)||'general'},Object.fromEntries(FIELDS.map(([k])=>[k,mine?mine[k]:0]))));
   return head+`<form id="report-form" novalidate>
     <div class="field"><label for="r-dept">מחלק</label>
       <select id="r-dept" class="input">${DEPTS.map(d=>`<option value="${d.id}"${d.id===dr.dept?' selected':''}>${esc(d.name)}</option>`).join('')}</select></div>
@@ -1819,12 +1849,12 @@ function teamSheet(){
       <span class="ta"><button type="button" class="btn btn-primary btn-sm" data-act="reset-pn" data-u="${esc(u)}">איפוס</button><button type="button" class="btn btn-ghost btn-sm" data-act="reset-ignore" data-u="${esc(u)}">התעלמות</button></span></li>`).join('');
   const loginTag=u=>{const d=S.authOf[u];if(!d||!d.hash)return '<span class="tlink off">טרם הגדיר מספר אישי</span>';return `<span class="tlink on">${(d.bio||[]).length?'מספר אישי + זיהוי ביומטרי':'מספר אישי'}</span>`;};
   const row=r=>{const us=devsOf(r.id), u=us[0], m=permOf(r.id), mt=[m.tasks?'שליחת משימות':'',m.sched?'סידור עבודה':''].filter(Boolean).join(' · ');
-    return `<li class="trow"><span class="tt"><span class="tn">${esc(r.name)} ${own?`<span class="tlink ${u?'on':'off'}">${u?'מחובר':'לא מחובר'}</span>`:''}${mt?` <span class="tlink on">מנהל: ${esc(mt)}</span>`:''}</span><span class="ts">${esc(personRules(r).join(' · '))}${r.notes?` · ${esc(r.notes)}`:''}</span>${own?us.map(x=>`<span class="ts">${esc(devText(x))} ${loginTag(x)} <button type="button" class="linkbtn mini" data-act="unlink" data-u="${esc(x)}">ניתוק</button></span>`).join(''):''}</span>
+    return `<li class="trow"><span class="tt"><span class="tn">${esc(r.name)}${r.lead?' <span class="tlink on">ר"צ</span>':''} ${own?`<span class="tlink ${u?'on':'off'}">${u?'מחובר':'לא מחובר'}</span>`:''}${mt?` <span class="tlink on">מנהל: ${esc(mt)}</span>`:''}</span><span class="ts">${esc(personRules(r).join(' · '))}${r.notes?` · ${esc(r.notes)}`:''}</span>${own?us.map(x=>`<span class="ts">${esc(devText(x))} ${loginTag(x)} <button type="button" class="linkbtn mini" data-act="unlink" data-u="${esc(x)}">ניתוק</button></span>`).join(''):''}</span>
       ${own?`<span class="ta"><button type="button" class="btn btn-ghost btn-sm" data-act="edit-person" data-p="${r.id}">עריכה</button>${(()=>{const x=us.find(z=>S.authOf[z]&&S.authOf[z].hash);return x?`<button type="button" class="btn btn-ghost btn-sm" data-act="reset-pn" data-u="${esc(x)}">איפוס כניסה</button>`:'';})()}</span>`:''}</li>`;};
   if(!own) return `<div class="grab"></div>
     <div class="phead"><h3 class="ptitle" id="sheet-title">הצוות וכללי השיבוץ</h3><button type="button" class="x" data-act="close" aria-label="סגירה">${svg('x')}</button></div>
     <p class="hint">רק המנהל הראשי מוסיף אנשים, מאשר גישה ומשנה כללים והרשאות.</p>
-    ${GROUPS.map(([gk,gl])=>{const ps=PEOPLE.filter(r=>grpOf(r)===gk);return ps.length?`<div class="tgroup"><h4>${gl}</h4><ul class="tlist">${ps.map(row).join('')}</ul></div>`:'';}).join('')}`;
+    ${rosterGroups().map(([gl,ps])=>`<div class="tgroup"><h4>${esc(gl)}</h4><ul class="tlist">${ps.map(row).join('')}</ul></div>`).join('')}`;
   return `<div class="grab"></div>
     <div class="phead"><h3 class="ptitle" id="sheet-title">צוות וכללים אישיים</h3><button type="button" class="x" data-act="close" aria-label="סגירה">${svg('x')}</button></div>
     ${claims.length?`<section class="rsec"><h4>בקשות הצטרפות</h4><ul class="tlist">${pend}</ul></section>`:''}
@@ -1834,7 +1864,7 @@ function teamSheet(){
       <li>הוא בוחר את השם שלו ומזין מספר אישי. אם השם לא ברשימה, הוא ממלא פרטים.</li>
       <li>הבקשה מופיעה כאן. מאשרים, ולשם חדש קובעים אם הוא בסידור ואילו כללים חלים עליו.</li>
       <li>מאותו רגע הוא נכנס עם המספר האישי, או עם Face ID / טביעת אצבע אם הפעיל. שכח את המספר? הבקשה מגיעה לכאן ומאפסים.</li></ol></section>
-    ${GROUPS.map(([gk,gl])=>{const ps=PEOPLE.filter(r=>grpOf(r)===gk);return ps.length?`<div class="tgroup"><h4>${gl}</h4><ul class="tlist">${ps.map(row).join('')}</ul></div>`:'';}).join('')}
+    ${rosterGroups().map(([gl,ps])=>`<div class="tgroup"><h4>${esc(gl)}</h4><ul class="tlist">${ps.map(row).join('')}</ul></div>`).join('')}
     <button type="button" class="addbtn" data-act="edit-person" data-p="">${svg('plus')}הוספת אדם לצוות</button>
     <section class="rsec"><h4>בדיקות</h4>
       <button type="button" class="btn btn-ghost" data-act="sys-check">${svg('check')}בדיקת מערכת והרשאות</button>
@@ -1868,6 +1898,8 @@ function personSheet(id,pendingUid){
       <div class="pe-sec" id="pe-absent"${r.kind==='absent'?'':' hidden'}>
         <div class="field"><label for="pe-status">סטטוס</label><select id="pe-status" class="input">${['LEAVE','COURSE'].map(c=>`<option value="${c}"${r.status===c?' selected':''}>${esc(SH[c].n)} · ${esc(SH[c].ds)}</option>`).join('')}</select></div>
       </div>
+      <div class="field"><label for="pe-team">צוות</label><select id="pe-team" class="input"><option value="">ללא צוות</option>${TEAMS.map(t=>`<option value="${t.id}"${r.team===t.id?' selected':''}>${t.name}</option>`).join('')}</select></div>
+      <label class="check"><input type="checkbox" id="pe-lead"${r.lead?' checked':''}>ראש צוות (ר"צ)</label>
       <label class="check"><input type="checkbox" id="pe-tasks"${r.tasks?' checked':''}>מקבל משימות ומגיש דיווח משמרת</label>
       <fieldset><legend class="legend-t">הרשאות ניהול</legend><div class="kinds">
         <label class="check"><input type="checkbox" id="pe-perm-tasks"${permOf(id).tasks?' checked':''}><span>שליחת משימות ועדכונים לחוקרים<small>רואה את כל המשימות, מקבל התראות על ביצוע וחריגות</small></span></label>
@@ -2027,7 +2059,8 @@ function readPersonForm(f){
     weekend:$('#pe-weekend').checked, triplet:tri===''?null:+tri,
     reinf:$('#pe-reinf').checked, studyDay:st===''?null:+st,
     court:$('#pe-court').value||null, fixed:$('#pe-fixed').value, status:$('#pe-status').value,
-    tasks:$('#pe-tasks').checked, notes:$('#pe-notes').value.trim().slice(0,400)};
+    tasks:$('#pe-tasks').checked, notes:$('#pe-notes').value.trim().slice(0,400),
+    team:$('#pe-team').value||null, lead:$('#pe-team').value?$('#pe-lead').checked:false};
 }
 
 document.addEventListener('click',e=>{
@@ -2240,6 +2273,7 @@ document.addEventListener('submit',async e=>{
     const list=rosterList().slice(); const i=list.findIndex(p=>p.id===id);
     const person=normPerson(Object.assign({},i>=0?list[i]:{},v,{id}));
     if(i>=0) list[i]=person; else list.push(person);
+    if(person.lead) list.forEach((p,k)=>{if(p.id!==id&&p.team===person.team&&p.lead) list[k]=Object.assign({},p,{lead:false});});
     const nextPerm={tasks:$('#pe-perm-tasks').checked,sched:$('#pe-perm-sched').checked}, curPerm=permOf(id);
     try{
       const jobs=[saveRoster(list)];
@@ -2558,7 +2592,7 @@ function subscribeAll(){
 function subscribeMember(){
   unsubMember();
   const m=x=>memberSubs.push(x);
-  m(DB.doc('team/roster').onSnapshot(d=>{const v=d.exists?d.data():null;S.rosterDoc=!!v;setRoster(v&&v.people);S.ready.roster=true;changed();},onSubErr));
+  m(DB.doc('team/roster').onSnapshot(d=>{const v=d.exists?d.data():null;S.rosterDoc=!!v;S.rosterPatches=(v&&v.patches)||[];setRoster(v&&v.people);S.ready.roster=true;changed();setTimeout(applyRosterPatches,0);},onSubErr));
   m(DB.doc('team/perms').onSnapshot(d=>{const v=d.exists?d.data():{};S.perms={managers:Object.assign({},v.managers||{})};S.ready.perms=true;changed();},onSubErr));
   const since=Date.now()-TASK_WINDOW; if(!S.loadedFrom||S.loadedFrom>since) S.loadedFrom=since;
   const toMap=s=>{const o={};s.docs.forEach(d=>{o[d.id]=d.data();});return o;};
