@@ -1,0 +1,405 @@
+npm warn deprecated uuid@7.0.3: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+
+added 103 packages, and audited 104 packages in 2s
+
+11 packages are looking for funding
+  run `npm fund` for details
+
+3 moderate severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+✔ Copying web assets from native-www to android/app/src/main/assets/public in 3.16ms
+✔ Creating capacitor.config.json in android/app/src/main/assets in 509.91μs
+✔ copy android in 10.22ms
+✔ Updating Android plugins in 852.03μs
+[info] Found 4 Capacitor plugins for android:
+       @aparajita/capacitor-biometric-auth@10.0.0
+       @capacitor/app@8.1.1
+       @capacitor/splash-screen@8.0.2
+       @capacitor/status-bar@8.0.3
+✔ update android in 23.42ms
+[info] Sync finished in 0.049s
+Downloading https://services.gradle.org/distributions/gradle-8.14.3-all.zip
+.....................10%.....................20%......................30%.....................40%......................50%.....................60%.....................70%......................80%.....................90%......................100%
+
+Welcome to Gradle 8.14.3!
+
+Here are the highlights of this release:
+ - Java 24 support
+ - GraalVM Native Image toolchain selection
+ - Enhancements to test reporting
+ - Build Authoring improvements
+
+For more details see https://docs.gradle.org/8.14.3/release-notes.html
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :app
+WARNING: Using flatDir should be avoided because it doesn't support any meta-data formats.
+
+> Configure project :capacitor-cordova-android-plugins
+WARNING: Using flatDir should be avoided because it doesn't support any meta-data formats.
+
+> Task :aparajita-capacitor-biometric-auth:preBuild UP-TO-DATE
+> Task :aparajita-capacitor-biometric-auth:preReleaseBuild UP-TO-DATE
+> Task :capacitor-android:preBuild UP-TO-DATE
+> Task :capacitor-android:preReleaseBuild UP-TO-DATE
+> Task :capacitor-android:writeReleaseAarMetadata
+> Task :aparajita-capacitor-biometric-auth:mergeReleaseJniLibFolders
+> Task :aparajita-capacitor-biometric-auth:mergeReleaseNativeLibs NO-SOURCE
+> Task :aparajita-capacitor-biometric-auth:stripReleaseDebugSymbols NO-SOURCE
+> Task :aparajita-capacitor-biometric-auth:checkReleaseAarMetadata
+> Task :aparajita-capacitor-biometric-auth:copyReleaseJniLibsProjectAndLocalJars
+> Task :aparajita-capacitor-biometric-auth:generateReleaseResValues
+> Task :aparajita-capacitor-biometric-auth:extractDeepLinksForAarRelease
+> Task :aparajita-capacitor-biometric-auth:generateReleaseResources
+> Task :aparajita-capacitor-biometric-auth:packageReleaseResources
+> Task :aparajita-capacitor-biometric-auth:processReleaseNavigationResources
+> Task :capacitor-android:generateReleaseResValues
+> Task :capacitor-android:generateReleaseResources
+> Task :capacitor-android:packageReleaseResources
+> Task :capacitor-android:processReleaseNavigationResources
+> Task :capacitor-android:javaPreCompileRelease
+> Task :aparajita-capacitor-biometric-auth:mergeReleaseShaders
+> Task :aparajita-capacitor-biometric-auth:compileReleaseShaders NO-SOURCE
+> Task :aparajita-capacitor-biometric-auth:generateReleaseAssets UP-TO-DATE
+> Task :aparajita-capacitor-biometric-auth:mergeReleaseAssets
+> Task :capacitor-android:parseReleaseLocalResources
+> Task :aparajita-capacitor-biometric-auth:parseReleaseLocalResources
+> Task :aparajita-capacitor-biometric-auth:javaPreCompileRelease
+> Task :aparajita-capacitor-biometric-auth:prepareLintJarForPublish
+> Task :aparajita-capacitor-biometric-auth:prepareReleaseArtProfile
+> Task :capacitor-android:generateReleaseRFile
+> Task :aparajita-capacitor-biometric-auth:generateReleaseRFile
+> Task :aparajita-capacitor-biometric-auth:processReleaseJavaRes NO-SOURCE
+> Task :aparajita-capacitor-biometric-auth:processReleaseManifest
+
+> Task :capacitor-android:compileReleaseJavaWithJavac
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :aparajita-capacitor-biometric-auth:writeReleaseAarMetadata
+> Task :capacitor-android:bundleLibCompileToJarRelease
+> Task :aparajita-capacitor-biometric-auth:mergeReleaseJavaResource
+> Task :aparajita-capacitor-biometric-auth:mapReleaseSourceSetPaths
+> Task :aparajita-capacitor-biometric-auth:extractReleaseAnnotations
+> Task :aparajita-capacitor-biometric-auth:compileReleaseJavaWithJavac
+> Task :aparajita-capacitor-biometric-auth:mergeReleaseGeneratedProguardFiles
+> Task :aparajita-capacitor-biometric-auth:mergeReleaseConsumerProguardFiles
+> Task :aparajita-capacitor-biometric-auth:syncReleaseLibJars
+> Task :aparajita-capacitor-biometric-auth:bundleReleaseAar
+> Task :aparajita-capacitor-biometric-auth:mergeReleaseResources
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preReleaseBuild UP-TO-DATE
+> Task :aparajita-capacitor-biometric-auth:copyReleaseJniLibsProjectOnly
+> Task :app:mergeReleaseJniLibFolders
+> Task :capacitor-android:mergeReleaseJniLibFolders
+> Task :capacitor-android:mergeReleaseNativeLibs NO-SOURCE
+> Task :capacitor-app:preBuild UP-TO-DATE
+> Task :capacitor-app:preReleaseBuild UP-TO-DATE
+> Task :capacitor-android:copyReleaseJniLibsProjectOnly
+> Task :capacitor-app:mergeReleaseJniLibFolders
+> Task :capacitor-app:mergeReleaseNativeLibs NO-SOURCE
+> Task :capacitor-cordova-android-plugins:preBuild UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:preReleaseBuild UP-TO-DATE
+> Task :capacitor-app:copyReleaseJniLibsProjectOnly
+> Task :capacitor-cordova-android-plugins:mergeReleaseJniLibFolders
+> Task :capacitor-cordova-android-plugins:mergeReleaseNativeLibs NO-SOURCE
+> Task :capacitor-splash-screen:preBuild UP-TO-DATE
+> Task :capacitor-splash-screen:preReleaseBuild UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:copyReleaseJniLibsProjectOnly
+> Task :capacitor-splash-screen:mergeReleaseJniLibFolders
+> Task :capacitor-splash-screen:mergeReleaseNativeLibs NO-SOURCE
+> Task :capacitor-status-bar:preBuild UP-TO-DATE
+> Task :capacitor-status-bar:preReleaseBuild UP-TO-DATE
+> Task :capacitor-splash-screen:copyReleaseJniLibsProjectOnly
+> Task :capacitor-status-bar:mergeReleaseJniLibFolders
+> Task :capacitor-status-bar:mergeReleaseNativeLibs NO-SOURCE
+> Task :capacitor-status-bar:copyReleaseJniLibsProjectOnly
+> Task :aparajita-capacitor-biometric-auth:bundleLibRuntimeToDirRelease
+> Task :capacitor-android:compileReleaseLibraryResources
+> Task :app:mergeReleaseNativeLibs NO-SOURCE
+> Task :app:stripReleaseDebugSymbols NO-SOURCE
+> Task :app:extractReleaseNativeSymbolTables NO-SOURCE
+> Task :app:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :capacitor-app:generateReleaseResValues
+> Task :capacitor-app:generateReleaseResources
+> Task :capacitor-app:packageReleaseResources
+> Task :capacitor-app:processReleaseNavigationResources
+> Task :capacitor-splash-screen:generateReleaseResValues
+> Task :capacitor-splash-screen:generateReleaseResources
+> Task :capacitor-splash-screen:packageReleaseResources
+> Task :capacitor-splash-screen:processReleaseNavigationResources
+> Task :capacitor-app:parseReleaseLocalResources
+> Task :capacitor-app:javaPreCompileRelease
+> Task :capacitor-splash-screen:parseReleaseLocalResources
+> Task :capacitor-app:generateReleaseRFile
+> Task :capacitor-splash-screen:javaPreCompileRelease
+> Task :capacitor-splash-screen:generateReleaseRFile
+> Task :capacitor-app:compileReleaseJavaWithJavac
+> Task :capacitor-app:bundleLibRuntimeToDirRelease
+> Task :capacitor-splash-screen:compileReleaseJavaWithJavac
+> Task :capacitor-status-bar:generateReleaseResValues
+> Task :capacitor-status-bar:generateReleaseResources
+> Task :capacitor-splash-screen:bundleLibRuntimeToDirRelease
+> Task :capacitor-status-bar:packageReleaseResources
+> Task :capacitor-status-bar:processReleaseNavigationResources
+> Task :capacitor-status-bar:parseReleaseLocalResources
+> Task :capacitor-status-bar:generateReleaseRFile
+> Task :capacitor-status-bar:javaPreCompileRelease
+> Task :capacitor-status-bar:compileReleaseJavaWithJavac
+> Task :aparajita-capacitor-biometric-auth:verifyReleaseResources
+> Task :aparajita-capacitor-biometric-auth:assembleRelease
+> Task :capacitor-status-bar:bundleLibRuntimeToDirRelease
+> Task :capacitor-cordova-android-plugins:generateReleaseResValues
+> Task :capacitor-cordova-android-plugins:generateReleaseResources
+> Task :capacitor-android:bundleLibRuntimeToDirRelease
+> Task :capacitor-cordova-android-plugins:packageReleaseResources
+> Task :capacitor-cordova-android-plugins:processReleaseNavigationResources
+> Task :capacitor-cordova-android-plugins:parseReleaseLocalResources
+> Task :capacitor-cordova-android-plugins:generateReleaseRFile
+> Task :capacitor-cordova-android-plugins:javaPreCompileRelease
+> Task :capacitor-cordova-android-plugins:compileReleaseJavaWithJavac NO-SOURCE
+> Task :capacitor-cordova-android-plugins:bundleLibRuntimeToDirRelease
+> Task :aparajita-capacitor-biometric-auth:bundleLibCompileToJarRelease
+> Task :app:javaPreCompileRelease
+> Task :app:checkReleaseDuplicateClasses
+> Task :aparajita-capacitor-biometric-auth:compileReleaseLibraryResources
+> Task :capacitor-app:writeReleaseAarMetadata
+> Task :capacitor-cordova-android-plugins:writeReleaseAarMetadata
+> Task :capacitor-splash-screen:writeReleaseAarMetadata
+> Task :capacitor-status-bar:writeReleaseAarMetadata
+> Task :app:processReleaseNavigationResources
+> Task :app:checkReleaseAarMetadata
+> Task :app:generateReleaseResValues
+> Task :app:compileReleaseNavigationResources
+> Task :app:mapReleaseSourceSetPaths
+> Task :app:generateReleaseResources
+> Task :app:packageReleaseResources
+> Task :app:createReleaseCompatibleScreenManifests
+> Task :aparajita-capacitor-biometric-auth:extractDeepLinksRelease
+> Task :app:extractDeepLinksRelease
+> Task :capacitor-android:extractDeepLinksRelease
+> Task :app:parseReleaseLocalResources
+> Task :capacitor-app:extractDeepLinksRelease
+> Task :capacitor-android:processReleaseManifest
+> Task :capacitor-cordova-android-plugins:extractDeepLinksRelease
+> Task :capacitor-cordova-android-plugins:processReleaseManifest
+> Task :capacitor-splash-screen:extractDeepLinksRelease
+> Task :capacitor-app:processReleaseManifest
+> Task :capacitor-status-bar:extractDeepLinksRelease
+> Task :capacitor-splash-screen:processReleaseManifest
+> Task :capacitor-status-bar:processReleaseManifest
+> Task :capacitor-app:compileReleaseLibraryResources
+> Task :app:mergeReleaseResources
+> Task :app:processReleaseMainManifest
+> Task :app:processReleaseManifest
+> Task :capacitor-cordova-android-plugins:compileReleaseLibraryResources
+> Task :capacitor-splash-screen:compileReleaseLibraryResources
+> Task :capacitor-status-bar:compileReleaseLibraryResources
+> Task :capacitor-cordova-android-plugins:bundleLibCompileToJarRelease
+> Task :capacitor-app:bundleLibCompileToJarRelease
+> Task :capacitor-splash-screen:bundleLibCompileToJarRelease
+> Task :capacitor-status-bar:bundleLibCompileToJarRelease
+> Task :app:desugarReleaseFileDependencies
+> Task :app:mergeReleaseStartupProfile
+> Task :capacitor-android:prepareReleaseArtProfile
+> Task :app:processReleaseManifestForPackage
+> Task :capacitor-app:prepareReleaseArtProfile
+> Task :capacitor-cordova-android-plugins:prepareReleaseArtProfile
+> Task :capacitor-splash-screen:prepareReleaseArtProfile
+> Task :capacitor-status-bar:prepareReleaseArtProfile
+> Task :app:mergeReleaseArtProfile
+> Task :aparajita-capacitor-biometric-auth:bundleLibRuntimeToJarRelease
+> Task :capacitor-app:bundleLibRuntimeToJarRelease
+> Task :capacitor-splash-screen:bundleLibRuntimeToJarRelease
+> Task :capacitor-status-bar:bundleLibRuntimeToJarRelease
+> Task :capacitor-android:bundleLibRuntimeToJarRelease
+> Task :capacitor-cordova-android-plugins:bundleLibRuntimeToJarRelease
+> Task :app:mergeReleaseShaders
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :capacitor-android:mergeReleaseShaders
+> Task :capacitor-android:compileReleaseShaders NO-SOURCE
+> Task :capacitor-android:generateReleaseAssets UP-TO-DATE
+> Task :capacitor-android:mergeReleaseAssets
+> Task :capacitor-app:mergeReleaseShaders
+> Task :capacitor-app:compileReleaseShaders NO-SOURCE
+> Task :capacitor-app:generateReleaseAssets UP-TO-DATE
+> Task :capacitor-app:mergeReleaseAssets
+> Task :capacitor-cordova-android-plugins:mergeReleaseShaders
+> Task :capacitor-cordova-android-plugins:compileReleaseShaders NO-SOURCE
+> Task :capacitor-cordova-android-plugins:generateReleaseAssets UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:mergeReleaseAssets
+> Task :capacitor-splash-screen:mergeReleaseShaders
+> Task :capacitor-splash-screen:compileReleaseShaders NO-SOURCE
+> Task :capacitor-splash-screen:generateReleaseAssets UP-TO-DATE
+> Task :capacitor-splash-screen:mergeReleaseAssets
+> Task :capacitor-status-bar:mergeReleaseShaders
+> Task :capacitor-status-bar:compileReleaseShaders NO-SOURCE
+> Task :capacitor-status-bar:generateReleaseAssets UP-TO-DATE
+> Task :capacitor-status-bar:mergeReleaseAssets
+> Task :app:mergeReleaseAssets
+> Task :app:compressReleaseAssets
+> Task :app:extractReleaseVersionControlInfo
+> Task :aparajita-capacitor-biometric-auth:extractProguardFiles
+> Task :capacitor-android:processReleaseJavaRes NO-SOURCE
+> Task :capacitor-android:createFullJarRelease
+> Task :capacitor-android:extractProguardFiles
+> Task :app:processReleaseResources
+> Task :capacitor-android:generateReleaseLintModel
+> Task :app:compileReleaseJavaWithJavac
+> Task :app:dexBuilderRelease
+> Task :app:mergeReleaseGlobalSynthetics
+> Task :capacitor-android:prepareLintJarForPublish
+> Task :aparajita-capacitor-biometric-auth:generateReleaseLintVitalModel
+> Task :capacitor-android:stripReleaseDebugSymbols NO-SOURCE
+> Task :capacitor-android:checkReleaseAarMetadata
+> Task :capacitor-android:copyReleaseJniLibsProjectAndLocalJars
+> Task :capacitor-android:extractDeepLinksForAarRelease
+> Task :capacitor-android:extractReleaseAnnotations
+> Task :capacitor-android:mergeReleaseGeneratedProguardFiles
+> Task :capacitor-android:mergeReleaseConsumerProguardFiles
+> Task :capacitor-android:mergeReleaseJavaResource
+> Task :capacitor-android:writeReleaseLintModelMetadata
+> Task :capacitor-android:syncReleaseLibJars
+> Task :capacitor-android:bundleReleaseLocalLintAar
+> Task :aparajita-capacitor-biometric-auth:createFullJarRelease
+> Task :aparajita-capacitor-biometric-auth:generateReleaseLintModel
+> Task :app:extractProguardFiles
+> Task :capacitor-app:processReleaseJavaRes NO-SOURCE
+> Task :capacitor-app:createFullJarRelease
+> Task :capacitor-app:extractProguardFiles
+> Task :app:mergeExtDexRelease
+> Task :capacitor-app:generateReleaseLintModel
+> Task :capacitor-app:prepareLintJarForPublish
+> Task :capacitor-cordova-android-plugins:processReleaseJavaRes NO-SOURCE
+> Task :capacitor-cordova-android-plugins:createFullJarRelease
+> Task :capacitor-cordova-android-plugins:extractProguardFiles
+> Task :capacitor-cordova-android-plugins:generateReleaseLintModel
+> Task :capacitor-cordova-android-plugins:prepareLintJarForPublish
+> Task :capacitor-splash-screen:processReleaseJavaRes NO-SOURCE
+> Task :capacitor-splash-screen:createFullJarRelease
+> Task :capacitor-splash-screen:extractProguardFiles
+> Task :capacitor-splash-screen:generateReleaseLintModel
+> Task :capacitor-splash-screen:prepareLintJarForPublish
+> Task :capacitor-status-bar:processReleaseJavaRes NO-SOURCE
+> Task :capacitor-status-bar:createFullJarRelease
+> Task :capacitor-status-bar:extractProguardFiles
+> Task :capacitor-status-bar:generateReleaseLintModel
+> Task :capacitor-status-bar:prepareLintJarForPublish
+> Task :aparajita-capacitor-biometric-auth:bundleReleaseLocalLintAar
+> Task :app:generateReleaseLintVitalReportModel
+> Task :capacitor-app:checkReleaseAarMetadata
+> Task :capacitor-app:stripReleaseDebugSymbols NO-SOURCE
+> Task :capacitor-app:copyReleaseJniLibsProjectAndLocalJars
+> Task :capacitor-app:extractDeepLinksForAarRelease
+> Task :capacitor-app:extractReleaseAnnotations
+> Task :capacitor-app:mergeReleaseGeneratedProguardFiles
+> Task :capacitor-app:mergeReleaseConsumerProguardFiles
+> Task :capacitor-app:mergeReleaseJavaResource
+> Task :capacitor-app:syncReleaseLibJars
+> Task :capacitor-app:bundleReleaseLocalLintAar
+> Task :capacitor-splash-screen:stripReleaseDebugSymbols NO-SOURCE
+> Task :capacitor-splash-screen:checkReleaseAarMetadata
+> Task :capacitor-splash-screen:copyReleaseJniLibsProjectAndLocalJars
+> Task :capacitor-splash-screen:extractDeepLinksForAarRelease
+> Task :capacitor-splash-screen:extractReleaseAnnotations
+> Task :capacitor-splash-screen:mergeReleaseGeneratedProguardFiles
+> Task :capacitor-splash-screen:mergeReleaseConsumerProguardFiles
+> Task :capacitor-splash-screen:mergeReleaseJavaResource
+> Task :capacitor-status-bar:checkReleaseAarMetadata
+> Task :capacitor-splash-screen:syncReleaseLibJars
+> Task :capacitor-splash-screen:bundleReleaseLocalLintAar
+> Task :capacitor-status-bar:stripReleaseDebugSymbols NO-SOURCE
+> Task :capacitor-status-bar:copyReleaseJniLibsProjectAndLocalJars
+> Task :capacitor-status-bar:extractDeepLinksForAarRelease
+> Task :capacitor-status-bar:extractReleaseAnnotations
+> Task :capacitor-status-bar:mergeReleaseGeneratedProguardFiles
+> Task :capacitor-status-bar:mergeReleaseConsumerProguardFiles
+> Task :capacitor-status-bar:mergeReleaseJavaResource
+> Task :capacitor-cordova-android-plugins:checkReleaseAarMetadata
+> Task :capacitor-status-bar:syncReleaseLibJars
+> Task :capacitor-status-bar:bundleReleaseLocalLintAar
+> Task :capacitor-cordova-android-plugins:stripReleaseDebugSymbols NO-SOURCE
+> Task :capacitor-cordova-android-plugins:extractDeepLinksForAarRelease
+> Task :capacitor-cordova-android-plugins:copyReleaseJniLibsProjectAndLocalJars
+> Task :app:mergeDexRelease
+> Task :capacitor-cordova-android-plugins:extractReleaseAnnotations
+> Task :capacitor-cordova-android-plugins:mergeReleaseGeneratedProguardFiles
+> Task :capacitor-cordova-android-plugins:mergeReleaseConsumerProguardFiles
+> Task :aparajita-capacitor-biometric-auth:writeReleaseLintModelMetadata
+> Task :capacitor-cordova-android-plugins:mergeReleaseJavaResource
+> Task :capacitor-cordova-android-plugins:syncReleaseLibJars
+> Task :capacitor-cordova-android-plugins:bundleReleaseLocalLintAar
+> Task :capacitor-app:writeReleaseLintModelMetadata
+> Task :capacitor-cordova-android-plugins:writeReleaseLintModelMetadata
+> Task :capacitor-splash-screen:writeReleaseLintModelMetadata
+> Task :capacitor-status-bar:writeReleaseLintModelMetadata
+> Task :capacitor-android:generateReleaseLintVitalModel
+> Task :capacitor-app:generateReleaseLintVitalModel
+> Task :capacitor-cordova-android-plugins:generateReleaseLintVitalModel
+> Task :capacitor-splash-screen:generateReleaseLintVitalModel
+> Task :capacitor-status-bar:generateReleaseLintVitalModel
+> Task :app:processReleaseJavaRes NO-SOURCE
+> Task :app:compileReleaseArtProfile
+> Task :app:optimizeReleaseResources
+> Task :app:collectReleaseDependencies
+> Task :app:sdkReleaseDependencyData
+> Task :app:validateSigningRelease
+> Task :app:writeReleaseAppMetadata
+> Task :app:mergeReleaseJavaResource
+> Task :app:writeReleaseSigningConfigVersions
+> Task :capacitor-android:bundleReleaseAar
+> Task :capacitor-android:mapReleaseSourceSetPaths
+> Task :capacitor-android:mergeReleaseResources
+> Task :capacitor-app:bundleReleaseAar
+> Task :capacitor-app:mapReleaseSourceSetPaths
+> Task :capacitor-app:mergeReleaseResources
+> Task :capacitor-android:verifyReleaseResources
+> Task :capacitor-android:assembleRelease
+> Task :capacitor-cordova-android-plugins:bundleReleaseAar
+> Task :capacitor-cordova-android-plugins:mapReleaseSourceSetPaths
+> Task :capacitor-app:verifyReleaseResources
+> Task :capacitor-cordova-android-plugins:mergeReleaseResources
+> Task :capacitor-app:assembleRelease
+> Task :capacitor-splash-screen:bundleReleaseAar
+> Task :capacitor-splash-screen:mapReleaseSourceSetPaths
+> Task :capacitor-splash-screen:mergeReleaseResources
+> Task :capacitor-cordova-android-plugins:verifyReleaseResources
+> Task :capacitor-cordova-android-plugins:assembleRelease
+> Task :capacitor-status-bar:bundleReleaseAar
+> Task :capacitor-status-bar:mapReleaseSourceSetPaths
+> Task :capacitor-splash-screen:verifyReleaseResources
+> Task :capacitor-status-bar:mergeReleaseResources
+> Task :capacitor-splash-screen:assembleRelease
+> Task :capacitor-status-bar:verifyReleaseResources
+> Task :capacitor-status-bar:assembleRelease
+> Task :aparajita-capacitor-biometric-auth:lintVitalAnalyzeRelease
+> Task :capacitor-app:lintVitalAnalyzeRelease
+> Task :capacitor-android:lintVitalAnalyzeRelease
+> Task :capacitor-cordova-android-plugins:lintVitalAnalyzeRelease
+> Task :capacitor-splash-screen:lintVitalAnalyzeRelease
+> Task :capacitor-status-bar:lintVitalAnalyzeRelease
+> Task :app:lintVitalAnalyzeRelease
+> Task :app:lintVitalReportRelease
+> Task :app:lintVitalRelease
+> Task :app:packageRelease
+> Task :app:createReleaseApkListingFileRedirect
+> Task :app:assembleRelease
+
+[Incubating] Problems report is available at: file:///home/runner/work/inv-office/inv-office/android/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 1m 56s
+284 actionable tasks: 284 executed
+result: success · run 2 · Tue Oct 13 10:14:11 UTC 2026
