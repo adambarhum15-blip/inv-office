@@ -1,0 +1,18 @@
+{
+  "appId": "com.adambarhum.invoffice",
+  "appName": "משימות",
+  "webDir": "native-www",
+  "server": {
+    "url": "https://adambarhum15-blip.github.io/inv-office/",
+    "androidScheme": "https",
+    "errorPath": "error.html"
+  },
+  "android": {
+    "backgroundColor": "#eef0ed",
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SystemBars": { "insetsHandling": "css", "initialViewportFitValueHint": "cover" },
+    "SplashScreen": { "launchShowDuration": 700, "launchAutoHide": true, "backgroundColor": "#22408f", "showSpinner": false }
+  }
+}

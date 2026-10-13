@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">משימות</string>
+    <string name="title_activity_main">משימות</string>
+    <string name="package_name">com.adambarhum.invoffice</string>
+    <string name="custom_url_scheme">com.adambarhum.invoffice</string>
+</resources>

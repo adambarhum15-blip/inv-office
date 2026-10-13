@@ -1,0 +1,99 @@
+rules_version = '2';
+// Security rules for the investigations office app. Paste into Firebase console > Firestore Database > Rules > Publish.
+// Roles: the main admin signs in with email + password; every other phone signs in anonymously and becomes a team member
+// only when the admin links it (team/links). Manager permissions come from team/perms.
+service cloud.firestore {
+  match /databases/{db}/documents {
+
+    function authed() { return request.auth != null; }
+    function me() { return request.auth.uid; }
+    function isAdmin() {
+      return authed() && request.auth.token.firebase.sign_in_provider == 'password'
+        && request.auth.token.email == 'adambarhum15@gmail.com';
+    }
+    function linksPath() { return /databases/$(db)/documents/team/links; }
+    function linked() { return authed() && exists(linksPath()) && me() in get(linksPath()).data.map; }
+    function member() { return isAdmin() || linked(); }
+    function person() { return get(linksPath()).data.map[me()]; }
+    function perm(k) {
+      let p = /databases/$(db)/documents/team/perms;
+      return linked() && exists(p) && person() in get(p).data.managers
+        && get(p).data.managers[person()].get(k, false) == true;
+    }
+    function nowish(t) { return t is int && t > request.time.toMillis() - 600000 && t < request.time.toMillis() + 600000; }
+
+    // names shown to phones that have not joined yet (names and groups only)
+    match /pub/{doc} {
+      allow read: if authed();
+      allow write: if isAdmin();
+    }
+    // roster, links between phones and people, manager permissions
+    match /team/{doc} {
+      allow read: if member();
+      allow write: if isAdmin();
+    }
+    // task numbers: managers may only move the counter forward by one, inside the transaction that creates the task
+    match /meta/counter {
+      allow read: if member();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (perm('tasks') && request.resource.data.n == resource.data.n + 1);
+    }
+    match /tasks/{key} {
+      allow read: if member();
+      allow create: if isAdmin() || (perm('tasks') && validNewTask());
+      allow update: if isAdmin() || takes() || finishes();
+      allow delete: if isAdmin();
+    }
+    function validNewTask() {
+      let d = request.resource.data;
+      return d.createdBy == person() && d.status == 'open' && d.takenBy == null && d.takenAt == null && d.doneAt == null
+        && nowish(d.createdAt) && d.desc is string && d.desc.size() > 0 && d.desc.size() <= 2000
+        && d.prio in ['high', 'med', 'low'] && (d.assignee == null || d.assignee is string)
+        && getAfter(/databases/$(db)/documents/meta/counter).data.n == d.num;
+    }
+    // an investigator takes an open task for himself, once
+    function takes() {
+      let o = resource.data;
+      let d = request.resource.data;
+      return linked() && o.status == 'open' && d.status == 'progress' && d.takenBy == person() && nowish(d.takenAt)
+        && (o.assignee == null || o.assignee == person())
+        && d.diff(o).affectedKeys().hasOnly(['status', 'takenBy', 'takenAt']);
+    }
+    // only the one who took it marks it done
+    function finishes() {
+      let o = resource.data;
+      let d = request.resource.data;
+      return linked() && o.status == 'progress' && o.takenBy == person() && d.status == 'done' && nowish(d.doneAt)
+        && d.diff(o).affectedKeys().hasOnly(['status', 'doneAt']);
+    }
+    match /sched/{week} {
+      allow read: if member();
+      allow write: if isAdmin() || perm('sched');
+    }
+    // a phone asking to join; only the admin approves
+    match /claims/{u} {
+      allow read: if isAdmin() || (authed() && me() == u);
+      allow create, update: if authed() && me() == u && !('approved' in request.resource.data);
+      allow write: if isAdmin();
+    }
+    // private per phone: shift reports, sign-in data, read marker. The admin reads reports and can reset a sign-in.
+    match /data/users/{u}/{doc} {
+      allow read, write: if authed() && me() == u;
+      allow read, write: if isAdmin();
+    }
+    // reserved for phone notifications (not active yet)
+    match /push/{u} {
+      allow read, delete: if authed() && me() == u;
+      allow create, update: if authed() && me() == u && (request.resource.data.get('admin', false) == false || isAdmin());
+    }
+    match /outbox/{id} {
+      allow read, delete: if isAdmin();
+      allow create, update: if authed() && request.resource.data.by == me() && member();
+    }
+    match /timers/{id} {
+      allow read: if isAdmin();
+      allow create, update: if member() && request.resource.data.by == me();
+      allow delete: if member();
+    }
+  }
+}

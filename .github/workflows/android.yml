@@ -1,0 +1,83 @@
+# Builds the Android app (APK) on every change to the native shell and publishes it as the newest GitHub release.
+# The download link https://github.com/<owner>/<repo>/releases/latest/download/inv-office.apk always points at the newest build.
+name: Android app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - 'native-www/**'
+      - 'capacitor.config.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Signing password is set
+        env:
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEY_PASSWORD" ]; then
+            echo "missing secret ANDROID_KEY_PASSWORD (Settings > Secrets and variables > Actions)" | tee build.log
+            exit 1
+          fi
+
+      - name: Prepare the native project
+        run: |
+          set -o pipefail
+          npm ci 2>&1 | tee -a build.log
+          npx cap sync android 2>&1 | tee -a build.log
+
+      - name: Build the APK
+        working-directory: android
+        env:
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -o pipefail
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace \
+            -PappVersionCode=${{ github.run_number }} -PappVersionName=1.0.${{ github.run_number }} 2>&1 | tee -a ../build.log
+          cp app/build/outputs/apk/release/app-release.apk ../inv-office.apk
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-${{ github.run_number }}
+          name: Android 1.0.${{ github.run_number }}
+          body: "קובץ ההתקנה של אפליקציית המשימות לאנדרואיד."
+          files: inv-office.apk
+          make_latest: true
+
+      # keeps the full build log on the ci-logs branch, so a failed build can be read without opening the Actions page
+      - name: Save the build log
+        if: always()
+        run: |
+          cp build.log /tmp/build.log 2>/dev/null || echo "no log" > /tmp/build.log
+          echo "result: ${{ job.status }} · run ${{ github.run_number }} · $(date -u)" >> /tmp/build.log
+          git config user.name "build-bot"
+          git config user.email "build-bot@users.noreply.github.com"
+          git checkout --orphan ci-logs-tmp
+          git rm -rfq --cached . || true
+          cp /tmp/build.log build.log
+          git add -f build.log
+          git commit -qm "build log ${{ github.run_number }} (${{ job.status }})"
+          git push -fq origin HEAD:ci-logs
